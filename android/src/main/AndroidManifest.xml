@@ -1,2 +1,20 @@
-<manifest>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+    <uses-permission android:name="android.permission.ACTIVITY_RECOGNITION" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+
+    <uses-feature
+        android:name="android.hardware.sensor.stepcounter"
+        android:required="true" />
+
+    <application>
+        <service
+            android:name=".PedometerService"
+            android:enabled="true"
+            android:exported="false"
+            android:foregroundServiceType="health"
+            tools:replace="android:foregroundServiceType" />
+    </application>
 </manifest>
