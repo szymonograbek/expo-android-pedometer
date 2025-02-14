@@ -1,4 +1,5 @@
-import {initialize, getStepsCountAsync, requestPermissions, setupBackgroundUpdates, requestNotificationPermissions} from 'android-pedometer';
+import {initialize, getStepsCountAsync, requestPermissions, setupBackgroundUpdates, requestNotificationPermissions, subscribeToChange, PedometerUpdateEventPayload} from 'android-pedometer';
+import { useEffect } from 'react';
 import { useState } from 'react';
 import { Button, SafeAreaView, Text, View, StyleSheet, Alert } from 'react-native';
 
@@ -6,6 +7,13 @@ export default function App() {
   const [stepsCount, setStepsCount] = useState(0);
   const [yesterdaySteps, setYesterdaySteps] = useState(0);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const subscription = subscribeToChange((event: PedometerUpdateEventPayload) => {
+      setStepsCount(event.steps);
+    });
+    return () => subscription();
+  }, []);
 
   const handleError = (error: any) => {
     const message = error?.message || 'Unknown error occurred';

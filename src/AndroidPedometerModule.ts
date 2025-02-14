@@ -2,6 +2,7 @@ import { requireNativeModule } from 'expo-modules-core';
 import {
   AndroidPedometerModuleEvents,
   PermissionResponse,
+  PedometerUpdateEventPayload,
 } from './AndroidPedometer.types';
 
 const AndroidPedometer = requireNativeModule<{
@@ -12,6 +13,7 @@ const AndroidPedometer = requireNativeModule<{
   setupBackgroundUpdates(notificationTitle?: string, notificationTemplate?: string): Promise<boolean>;
   customizeNotification(title?: string, textTemplate?: string): Promise<boolean>;
   setNotificationIcon(iconResourceId: number): Promise<boolean>;
+  addListener(eventName: string, listener: (event: any) => void): { remove: () => void };
 }>('AndroidPedometer');
 
 export function initialize(): Promise<boolean> {
@@ -40,6 +42,18 @@ export function customizeNotification(title?: string, textTemplate?: string): Pr
 
 export function setNotificationIcon(iconResourceId: number): Promise<boolean> {
   return AndroidPedometer.setNotificationIcon(iconResourceId);
+}
+
+export function subscribeToChange(
+  listener: (event: PedometerUpdateEventPayload) => void
+): () => void {
+  const eventSubscription = AndroidPedometer.addListener(
+    'AndroidPedometer.pedometerUpdate',
+    listener 
+  );
+  return () => {
+    eventSubscription.remove();
+  };
 }
 
 export { AndroidPedometerModuleEvents, PermissionResponse };
