@@ -1,0 +1,10 @@
+{
+  "extends": "expo/tsconfig.base",
+  "compilerOptions": {
+    "strict": true,
+    "paths": {
+      "android-pedometer": ["../src/index"],
+      "android-pedometer/*": ["../src/*"]
+    }
+  }
+}
