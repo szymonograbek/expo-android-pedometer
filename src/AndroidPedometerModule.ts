@@ -1,6 +1,7 @@
 import { requireNativeModule } from 'expo-modules-core';
 import {
   AndroidPedometerModuleEvents,
+  NotificationConfig,
   PermissionResponse,
   PedometerUpdateEventPayload,
 } from './AndroidPedometer.types';
@@ -10,9 +11,7 @@ const AndroidPedometer = requireNativeModule<{
   getStepsCountAsync(date?: string): Promise<number>;
   requestPermissions(): Promise<PermissionResponse>;
   requestNotificationPermissions(): Promise<PermissionResponse>;
-  setupBackgroundUpdates(notificationTitle?: string, notificationTemplate?: string): Promise<boolean>;
-  customizeNotification(title?: string, textTemplate?: string): Promise<boolean>;
-  setNotificationIcon(iconResourceId: number): Promise<boolean>;
+  setupBackgroundUpdates(config?: NotificationConfig): Promise<boolean>;
   addListener(eventName: string, listener: (event: any) => void): { remove: () => void };
 }>('AndroidPedometer');
 
@@ -32,16 +31,8 @@ export function requestNotificationPermissions(): Promise<PermissionResponse> {
   return AndroidPedometer.requestNotificationPermissions();
 }
 
-export async function setupBackgroundUpdates(notificationTitle?: string, notificationTemplate?: string): Promise<boolean> {
-  return await AndroidPedometer.setupBackgroundUpdates(notificationTitle, notificationTemplate);
-}
-
-export function customizeNotification(title?: string, textTemplate?: string): Promise<boolean> {
-  return AndroidPedometer.customizeNotification(title, textTemplate);
-}
-
-export function setNotificationIcon(iconResourceId: number): Promise<boolean> {
-  return AndroidPedometer.setNotificationIcon(iconResourceId);
+export async function setupBackgroundUpdates(config?: NotificationConfig): Promise<boolean> {
+  return await AndroidPedometer.setupBackgroundUpdates(config);
 }
 
 export function subscribeToChange(

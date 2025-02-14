@@ -13,6 +13,28 @@ export type AndroidPedometerModuleEvents = {
   'AndroidPedometer.pedometerUpdate': (event: PedometerUpdateEventPayload) => void;
 };
 
+export type NotificationStyle = 'default' | 'bigText';
+
+export type NotificationConfig = {
+  /**
+   * Title of the notification
+   */
+  title?: string;
+  /**
+   * Content template for the notification text (%d will be replaced with steps)
+   */
+  contentTemplate?: string;
+  /**
+   * Style of the notification
+   */
+  style?: NotificationStyle;
+  /**
+   * Resource name of the icon to use (e.g. 'ic_notification')
+   * The drawable must be present in the Android app's res/drawable folder
+   */
+  iconResourceName?: string;
+};
+
 export interface AndroidPedometerModule {
   /**
    * Initialize the pedometer module and prepare it for use.
@@ -48,25 +70,9 @@ export interface AndroidPedometerModule {
   /**
    * Setup background step counting that continues even when the app is in the background
    * or terminated. This will create a persistent notification to keep the service alive.
-   * @param notificationTitle Optional custom title for the persistent notification
-   * @param notificationTemplate Optional custom template for the notification text (%d will be replaced with steps)
+   * @param config Optional notification configuration
    * @returns Promise<boolean> - Returns true if background updates were successfully setup
    * @throws {Error} If pedometer is not initialized or fails to setup background updates
    */
-  setupBackgroundUpdates(notificationTitle?: string, notificationTemplate?: string): Promise<boolean>;
-
-  /**
-   * Customize the notification appearance after background updates are started.
-   * @param title Optional new title for the notification
-   * @param textTemplate Optional new template for the notification text (%d will be replaced with steps)
-   * @returns Promise<boolean> - Returns true if customization was successful
-   */
-  customizeNotification(title?: string, textTemplate?: string): Promise<boolean>;
-
-  /**
-   * Set a custom icon for the notification.
-   * @param iconResourceId Android resource ID of the icon to use
-   * @returns Promise<boolean> - Returns true if icon was set successfully
-   */
-  setNotificationIcon(iconResourceId: number): Promise<boolean>;
+  setupBackgroundUpdates(config?: NotificationConfig): Promise<boolean>;
 }

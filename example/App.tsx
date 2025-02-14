@@ -73,10 +73,11 @@ export default function App() {
 
   const handleSetupBackgroundUpdates = async () => {
     try {
-      await setupBackgroundUpdates(
-        "Pedometer", // custom notification title
-        "You made %d steps! 🚶‍♂️" // custom notification template with emoji
-      );
+      await setupBackgroundUpdates({
+        title: "Pedometer is working so it can track your steps.",
+        contentTemplate: "Steps today: %d. Keep it up!",
+        style: "bigText",
+      });
       setError(null);
     } catch (e) {
       handleError(e);

@@ -14,6 +14,8 @@ import expo.modules.kotlin.Promise
 import expo.modules.kotlin.exception.CodedException
 import expo.modules.kotlin.modules.Module
 import expo.modules.kotlin.modules.ModuleDefinition
+import expo.modules.kotlin.records.Record
+import expo.modules.kotlin.records.Field
 import java.time.LocalDate
 import android.content.Intent
 import android.util.Log
@@ -30,6 +32,20 @@ import expo.modules.androidpedometer.Constants.ACTION_RESUME_COUNTING
 private const val TAG = "AndroidPedometerModule"
 
 class PedometerError(message: String) : CodedException(message)
+
+class NotificationConfigRecord : Record {
+    @Field
+    var title: String? = null
+
+    @Field
+    var contentTemplate: String? = null
+
+    @Field
+    var style: String? = null
+
+    @Field
+    var iconResourceName: String? = null
+}
 
 class AndroidPedometerModule : Module() {
     private var sensorManager: SensorManager? = null
@@ -193,7 +209,7 @@ class AndroidPedometerModule : Module() {
             }
         }
 
-        AsyncFunction("setupBackgroundUpdates") { notificationTitle: String?, notificationTemplate: String?, promise: Promise ->
+        AsyncFunction("setupBackgroundUpdates") { config: NotificationConfigRecord?, promise: Promise ->
             try {
                 if (!isInitialized) {
                     throw PedometerError("Pedometer not initialized. Call initialize() first")
@@ -219,9 +235,15 @@ class AndroidPedometerModule : Module() {
                     }
                 }
 
-                // Set notification content if provided
-                if (notificationTitle != null || notificationTemplate != null) {
-                    PedometerService.setNotificationContent(notificationTitle, notificationTemplate)
+                // Set notification config if provided
+                if (config != null) {
+                    val notificationConfig = NotificationConfig(
+                        title = config.title,
+                        contentTemplate = config.contentTemplate,
+                        style = config.style,
+                        iconResourceName = config.iconResourceName
+                    )
+                    PedometerService.setNotificationConfig(notificationConfig)
                 }
 
                 // Start foreground service for background tracking
@@ -242,24 +264,6 @@ class AndroidPedometerModule : Module() {
             } catch (e: Exception) {
                 Log.e(TAG, "Error in setupBackgroundUpdates: ${e.message}", e)
                 promise.reject(PedometerError("Failed to setup background updates: ${e.message}"))
-            }
-        }
-
-        AsyncFunction("customizeNotification") { title: String?, textTemplate: String?, promise: Promise ->
-            try {
-                PedometerService.setNotificationContent(title, textTemplate)
-                promise.resolve(true)
-            } catch (e: Exception) {
-                promise.reject(PedometerError("Failed to customize notification: ${e.message}"))
-            }
-        }
-
-        AsyncFunction("setNotificationIcon") { iconResourceId: Int, promise: Promise ->
-            try {
-                PedometerService.setNotificationIcon(iconResourceId)
-                promise.resolve(true)
-            } catch (e: Exception) {
-                promise.reject(PedometerError("Failed to set notification icon: ${e.message}"))
             }
         }
 
