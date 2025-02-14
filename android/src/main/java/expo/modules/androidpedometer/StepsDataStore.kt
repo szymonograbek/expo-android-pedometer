@@ -1,62 +1,64 @@
 package expo.modules.androidpedometer
 
 import android.content.Context
-import android.content.SharedPreferences
+import androidx.room.Room
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.withContext
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
-import org.json.JSONArray
-import org.json.JSONObject
 
-class StepsDataStore(private val context: Context) {
-    companion object {
-        private const val PREFS_NAME = "PedometerPrefs"
-        private const val STEPS_DATA_KEY = "stepsData"
-        private val dateFormatter = DateTimeFormatter.ISO_LOCAL_DATE
+class StepsDataStore(context: Context) {
+    private val database = Room.databaseBuilder(
+        context,
+        StepsDatabase::class.java,
+        "steps_database"
+    ).build()
+
+    private val dao = database.stepsDao()
+    private val dateFormatter = DateTimeFormatter.ISO_LOCAL_DATE
+
+    private val _stepsFlow = MutableStateFlow<Map<LocalDate, Int>>(emptyMap())
+    val stepsFlow: StateFlow<Map<LocalDate, Int>> = _stepsFlow.asStateFlow()
+
+    suspend fun loadStepsData(date: LocalDate): Int = withContext(Dispatchers.IO) {
+        val dateStr = date.format(dateFormatter)
+        dao.getStepsForDate(dateStr)?.steps ?: 0
     }
 
-    private fun getSharedPreferences(): SharedPreferences {
-        return context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+    suspend fun incrementSteps(date: LocalDate, increment: Int) {
+        if (increment <= 0) return
+
+        withContext(Dispatchers.IO) {
+            val dateStr = date.format(dateFormatter)
+            val currentEntity = dao.getStepsForDate(dateStr)
+            
+            if (currentEntity == null) {
+                // First entry for this date
+                dao.insert(StepsEntity(
+                    date = dateStr,
+                    steps = increment,
+                    timestamp = System.currentTimeMillis()
+                ))
+            } else {
+                dao.incrementSteps(dateStr, increment)
+            }
+
+            // Update flow
+            val updatedSteps = dao.getStepsForDate(dateStr)?.steps ?: 0
+            _stepsFlow.value = _stepsFlow.value + (date to updatedSteps)
+        }
     }
 
-    fun loadStepsData(date: LocalDate): Int {
-        val prefs = getSharedPreferences()
-        val stepsDataStr = prefs.getString(STEPS_DATA_KEY, "[]")
-        val stepsDataArray = JSONArray(stepsDataStr)
-
-        for (i in 0 until stepsDataArray.length()) {
-            val entry = stepsDataArray.getJSONObject(i)
-            if (entry.getString("date") == date.format(dateFormatter)) {
-                return entry.getInt("steps")
+    suspend fun getStepsInRange(startDate: LocalDate, endDate: LocalDate): Map<LocalDate, Int> = 
+        withContext(Dispatchers.IO) {
+            dao.getStepsInRange(
+                startDate.format(dateFormatter),
+                endDate.format(dateFormatter)
+            ).associate { entity ->
+                LocalDate.parse(entity.date, dateFormatter) to entity.steps
             }
         }
-        return 0
-    }
-
-    fun saveStepsData(date: LocalDate, steps: Int, timestamp: Long) {
-        val prefs = getSharedPreferences()
-        val stepsDataStr = prefs.getString(STEPS_DATA_KEY, "[]")
-        val stepsDataArray = JSONArray(stepsDataStr)
-        
-        var found = false
-        for (i in 0 until stepsDataArray.length()) {
-            val entry = stepsDataArray.getJSONObject(i)
-            if (entry.getString("date") == date.format(dateFormatter)) {
-                entry.put("steps", steps)
-                entry.put("timestamp", timestamp)
-                found = true
-                break
-            }
-        }
-
-        if (!found) {
-            val newEntry = JSONObject().apply {
-                put("date", date.format(dateFormatter))
-                put("steps", steps)
-                put("timestamp", timestamp)
-            }
-            stepsDataArray.put(newEntry)
-        }
-
-        prefs.edit().putString(STEPS_DATA_KEY, stepsDataArray.toString()).apply()
-    }
 } 

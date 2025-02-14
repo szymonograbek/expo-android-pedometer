@@ -18,6 +18,10 @@ import java.time.LocalDate
 import android.content.Intent
 import android.util.Log
 import java.time.format.DateTimeFormatter
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 
 private const val PEDOMETER_UPDATE_EVENT = "AndroidPedometer.pedometerUpdate"
 private const val TAG = "AndroidPedometerModule"
@@ -30,42 +34,27 @@ class AndroidPedometerModule : Module() {
     private var sensorManager: SensorManager? = null
     private var stepCountSensor: Sensor? = null
     private var isInitialized = false
-    private var stepsAtTheBeginning: Int? = null
-    private var lastKnownSteps = 0
-    private var currentDaySteps = 0
-    private var lastUpdateDate = LocalDate.now()
-    private lateinit var stepsDataStore: StepsDataStore
+    private val moduleScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     private val dateFormatter = DateTimeFormatter.ISO_LOCAL_DATE
+    private lateinit var controller: StepCounterController
 
     private val sensorEventListener = object : SensorEventListener {
         override fun onSensorChanged(event: SensorEvent) {
-            val totalSteps = event.values[0].toInt()
+            val steps = event.values[0].toInt()
+            controller.onStepCountChanged(steps, LocalDate.now())
             
-            if (stepsAtTheBeginning == null) {
-                stepsAtTheBeginning = totalSteps
-                lastKnownSteps = totalSteps
-                currentDaySteps = stepsDataStore.loadStepsData(LocalDate.now())
-                return
+            moduleScope.launch {
+                try {
+                    val currentSteps = controller.state.value.steps
+                    Log.d(TAG, "Current steps: $currentSteps")
+                    sendEvent(PEDOMETER_UPDATE_EVENT, mapOf(
+                        "steps" to currentSteps,
+                        "timestamp" to System.currentTimeMillis()
+                    ))
+                } catch (e: Exception) {
+                    Log.e(TAG, "Error updating steps: ${e.message}")
+                }
             }
-
-            val currentDate = LocalDate.now()
-            if (currentDate != lastUpdateDate) {
-                stepsDataStore.saveStepsData(lastUpdateDate, currentDaySteps, System.currentTimeMillis())
-                stepsAtTheBeginning = totalSteps
-                currentDaySteps = 0
-                lastUpdateDate = currentDate
-            }
-
-            val stepsSinceReboot = totalSteps - (stepsAtTheBeginning ?: totalSteps)
-            currentDaySteps = stepsSinceReboot
-            lastKnownSteps = totalSteps
-            
-            stepsDataStore.saveStepsData(currentDate, currentDaySteps, System.currentTimeMillis())
-
-            sendEvent(PEDOMETER_UPDATE_EVENT, mapOf(
-                "steps" to currentDaySteps,
-                "timestamp" to System.currentTimeMillis()
-            ))
         }
 
         override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {}
@@ -93,15 +82,14 @@ class AndroidPedometerModule : Module() {
         AsyncFunction("initialize") { promise: Promise ->
             try {
                 if (!isInitialized) {
-                    stepsDataStore = StepsDataStore(appContext.reactContext!!)
+                    controller = StepCounterManager.getController(appContext.reactContext!!, moduleScope)
+                    
                     sensorManager = appContext.reactContext?.getSystemService(Context.SENSOR_SERVICE) as? SensorManager
                     stepCountSensor = sensorManager?.getDefaultSensor(Sensor.TYPE_STEP_COUNTER)
 
                     if (stepCountSensor == null) {
                         throw PedometerError("Step counter sensor not available on this device")
                     }
-
-                    pauseServiceCounting() // Pause service counting before starting our own
 
                     val result = sensorManager?.registerListener(
                         sensorEventListener,
@@ -111,6 +99,20 @@ class AndroidPedometerModule : Module() {
 
                     if (!result) {
                         throw PedometerError("Failed to register sensor listener")
+                    }
+
+                    // Get initial steps immediately after initialization
+                    moduleScope.launch {
+                        try {
+                            val initialSteps = controller.state.value.steps
+                            Log.d(TAG, "Initial steps: $initialSteps")
+                            sendEvent(PEDOMETER_UPDATE_EVENT, mapOf(
+                                "steps" to initialSteps,
+                                "timestamp" to System.currentTimeMillis()
+                            ))
+                        } catch (e: Exception) {
+                            Log.e(TAG, "Error getting initial steps: ${e.message}")
+                        }
                     }
 
                     isInitialized = true
@@ -135,13 +137,22 @@ class AndroidPedometerModule : Module() {
                     LocalDate.now()
                 }
 
-                val steps = if (targetDate == LocalDate.now()) {
-                    currentDaySteps
-                } else {
-                    stepsDataStore.loadStepsData(targetDate)
+                moduleScope.launch {
+                    try {
+                        val steps = if (targetDate == LocalDate.now()) {
+                            // For today, use the current state from controller
+                            controller.state.value.steps
+                        } else {
+                            // For historical data, get it from the database
+                            controller.getHistoricalSteps(targetDate)
+                        }
+                        Log.d(TAG, "Retrieved steps for ${targetDate}: $steps")
+                        promise.resolve(steps)
+                    } catch (e: Exception) {
+                        Log.e(TAG, "Error getting steps for ${targetDate}: ${e.message}")
+                        promise.reject(PedometerError("Failed to get steps count: ${e.message}"))
+                    }
                 }
-                
-                promise.resolve(steps)
             } catch (e: Exception) {
                 promise.reject(PedometerError("Failed to get steps count: ${e.message}"))
             }
@@ -255,6 +266,7 @@ class AndroidPedometerModule : Module() {
             sensorManager?.unregisterListener(sensorEventListener)
             resumeServiceCounting() // Resume service counting when module is destroyed
             isInitialized = false
+            StepCounterManager.reset()
         }
     }
 }
