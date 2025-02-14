@@ -1,7 +1,7 @@
 {
-  "name": "android-pedometer",
+  "name": "expo-android-pedometer",
   "version": "0.1.0",
-  "description": "Get steps count",
+  "description": "Get steps count on Android devices",
   "main": "build/index.js",
   "types": "build/index.d.ts",
   "scripts": {
@@ -25,7 +25,7 @@
   "bugs": {
     "url": "https://github.com/szymonograbek/android-pedometer/issues"
   },
-  "author": "Szymon Ograbek <szymon.ograbek2@gmail.com> (https://github.com/szymonograbek)",
+  "author": "Szymon Ograbek (https://github.com/szymonograbek)",
   "license": "MIT",
   "homepage": "https://github.com/szymonograbek/android-pedometer#readme",
   "dependencies": {},

@@ -158,7 +158,10 @@ class PedometerService : Service(), SensorEventListener {
 
         when (notificationConfig.style) {
             "bigText" -> {
-                builder.setStyle(NotificationCompat.BigTextStyle().bigText(notificationConfig.title))
+                notificationConfig.contentTemplate?.let { template ->
+                    val contentText = String.format(template, steps)
+                    builder.setStyle(NotificationCompat.BigTextStyle().bigText(contentText))
+                }
             }
             else -> {
                 // Only set content text if template is provided

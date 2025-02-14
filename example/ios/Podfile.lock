@@ -1774,7 +1774,7 @@ EXTERNAL SOURCES:
     :path: "../node_modules/react-native/ReactCommon/yoga"
 
 SPEC CHECKSUMS:
-  AndroidPedometer: 75fff693d8080f52c3aeb78fc1f092f8098c4387
+  AndroidPedometer: 05694cc0af63eef5d384b9c901055636d8cb25f8
   boost: 1dca942403ed9342f98334bf4c3621f011aa7946
   DoubleConversion: f16ae600a246532c4020132d54af21d0ddb2a385
   EXConstants: aa93a3e70f8b37c81a80931cfd23f860b1819167
