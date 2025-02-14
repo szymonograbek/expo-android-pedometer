@@ -22,11 +22,12 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
+import expo.modules.androidpedometer.Constants.PEDOMETER_UPDATE_EVENT
+import expo.modules.androidpedometer.Constants.ACTION_START_SERVICE
+import expo.modules.androidpedometer.Constants.ACTION_PAUSE_COUNTING
+import expo.modules.androidpedometer.Constants.ACTION_RESUME_COUNTING
 
-private const val PEDOMETER_UPDATE_EVENT = "AndroidPedometer.pedometerUpdate"
 private const val TAG = "AndroidPedometerModule"
-private const val ACTION_PAUSE_COUNTING = "expo.modules.androidpedometer.PAUSE_COUNTING"
-private const val ACTION_RESUME_COUNTING = "expo.modules.androidpedometer.RESUME_COUNTING"
 
 class PedometerError(message: String) : CodedException(message)
 

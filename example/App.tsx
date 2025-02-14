@@ -103,7 +103,7 @@ export default function App() {
           <Button title="Get Steps" onPress={handleGetSteps} />
           <Button title="Request Permissions" onPress={handleRequestPermissions} />
           <Button title="Request Notification Permissions" onPress={handleRequestNotificationPermissions} />
-          <Button title="Setup Background Updates" onPress={handleSetupBackgroundUpdates} />
+          <Button title="Setup Background Updates With Notification" onPress={handleSetupBackgroundUpdates} />
         </View>
       </View>
     </SafeAreaView>

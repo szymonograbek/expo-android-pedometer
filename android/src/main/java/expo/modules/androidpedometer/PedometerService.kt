@@ -29,7 +29,7 @@ class PedometerService : Service(), SensorEventListener {
         private const val TAG = "PedometerService"
         private var notificationTitle = "Step Counter Active"
         private var notificationTemplate = "Steps today: %d"
-        private var notificationIcon = android.R.drawable.ic_menu_compass // Default icon
+        private var notificationIcon = R.drawable.footprint 
 
         fun setNotificationContent(title: String?, template: String?) {
             title?.let { notificationTitle = it }
