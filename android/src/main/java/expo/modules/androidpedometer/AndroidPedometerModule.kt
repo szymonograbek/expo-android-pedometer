@@ -133,10 +133,9 @@ class AndroidPedometerModule : Module() {
                     }
 
                     isInitialized = true
-                    promise.resolve(true)
-                } else {
-                    promise.resolve(false)
                 }
+                // Always resolve with true if initialization is successful or already initialized
+                promise.resolve(true)
             } catch (e: Exception) {
                 promise.reject(PedometerError("Failed to initialize pedometer: ${e.message}"))
             }
