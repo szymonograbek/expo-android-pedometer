@@ -15,20 +15,6 @@ A native Android pedometer module for Expo/React Native applications that provid
 ```bash
 npx expo install expo-android-pedometer
 ```
-
-## Configuration
-
-### Android Permissions
-
-Add the following permissions to your `android/app/src/main/AndroidManifest.xml`:
-
-```xml
-<!-- Required for step counting -->
-<uses-permission android:name="android.permission.ACTIVITY_RECOGNITION" />
-<!-- Required for Android 13+ notifications -->
-<uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
-```
-
 ## API
 
 ### Methods
@@ -98,37 +84,6 @@ const unsubscribe = AndroidPedometer.subscribeToChange((event) => {
 unsubscribe();
 ```
 
-### Types
-
-#### `PedometerUpdateEventPayload`
-
-```typescript
-type PedometerUpdateEventPayload = {
-  steps: number;
-  timestamp: number;
-};
-```
-
-#### `PermissionResponse`
-
-```typescript
-type PermissionResponse = {
-  status: 'granted' | 'denied';
-  granted: boolean;
-  expires: 'never' | string;
-};
-```
-
-#### `NotificationConfig`
-
-```typescript
-type NotificationConfig = {
-  title?: string;
-  contentTemplate?: string;
-  style?: 'default' | 'bigText';
-  iconResourceName?: string;
-};
-```
 
 ## Example Usage
 
@@ -166,8 +121,14 @@ async function setupPedometer() {
 ## Notes
 
 - The module only works on Android devices with a built-in step counter sensor
-- Background tracking requires a persistent notification due to Android's background service restrictions
+- Background tracking requires a persistent notification 
 - Historical step data is stored locally on the device
+
+## TODO
+[] Optional sync to Health Connect
+[] Ability to disable notification and background sync
+[] More options to customize the notification
+[] Organize code
 
 ## License
 
