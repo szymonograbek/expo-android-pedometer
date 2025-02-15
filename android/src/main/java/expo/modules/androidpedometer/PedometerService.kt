@@ -128,9 +128,9 @@ class PedometerService : Service(), SensorEventListener {
             val channel = NotificationChannel(
                 NOTIFICATION_CHANNEL_ID,
                 "Step Counter",
-                NotificationManager.IMPORTANCE_DEFAULT
+                NotificationManager.IMPORTANCE_MIN
             ).apply {
-                setShowBadge(true)
+                setShowBadge(false)
                 enableVibration(false)
                 enableLights(false)
                 description = "Shows your current step count"
@@ -146,7 +146,7 @@ class PedometerService : Service(), SensorEventListener {
         val builder = NotificationCompat.Builder(this, NOTIFICATION_CHANNEL_ID)
             .setContentTitle(notificationConfig.title)
             .setSmallIcon(getIconResourceId(this, notificationConfig.iconResourceName))
-            .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+            .setPriority(NotificationCompat.PRIORITY_MIN)
             .setCategory(NotificationCompat.CATEGORY_STATUS)
             .setOngoing(true)
             .setOnlyAlertOnce(true)
