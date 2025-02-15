@@ -21,13 +21,13 @@
     "android-pedometer",
     "AndroidPedometer"
   ],
-  "repository": "https://github.com/szymonograbek/android-pedometer",
+  "repository": "https://github.com/szymonograbek/expo-android-pedometer",
   "bugs": {
-    "url": "https://github.com/szymonograbek/android-pedometer/issues"
+    "url": "https://github.com/szymonograbek/expo-android-pedometer/issues"
   },
   "author": "Szymon Ograbek (https://github.com/szymonograbek)",
   "license": "MIT",
-  "homepage": "https://github.com/szymonograbek/android-pedometer#readme",
+  "homepage": "https://github.com/szymonograbek/expo-android-pedometer#readme",
   "dependencies": {},
   "devDependencies": {
     "@types/react": "~18.3.12",

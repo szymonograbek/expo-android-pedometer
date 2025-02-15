@@ -125,10 +125,10 @@ async function setupPedometer() {
 - Historical step data is stored locally on the device
 
 ## TODO
-[] Optional sync to Health Connect
-[] Ability to disable notification and background sync
-[] More options to customize the notification
-[] Organize code
+- [ ] Optional sync to Health Connect
+- [ ] Ability to disable notification and background sync
+- [ ] More options to customize the notification
+- [ ] Organize code
 
 ## License
 
