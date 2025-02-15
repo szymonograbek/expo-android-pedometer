@@ -10,16 +10,6 @@ A native Android pedometer module for Expo/React Native applications that provid
 - 🔒 Proper permission handling
 - ⚡ Native implementation using Android's built-in step counter sensor
 
-## Technical Overview
-
-- **Hardware Sensor**: Uses Android's native step counter sensor for accurate, battery-efficient step detection
-
-- **Foreground Service**: Ensures continuous step counting in background through a persistent notification service
-
-- **Room Database**: Stores historical step data locally with efficient date-based querying
-
-- **Auto-Recovery**: Handles device reboots, sensor resets, and date changes automatically
-
 ## Installation
 
 ```bash
