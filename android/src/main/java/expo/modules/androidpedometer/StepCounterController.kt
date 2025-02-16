@@ -16,14 +16,6 @@ class StepCounterController(
     private val _state = MutableStateFlow(StepCounterState(Instant.now(), 0))
     val state: StateFlow<StepCounterState> = _state.asStateFlow()
 
-    private var sensorState = SensorState()
-
-    private data class SensorState(
-        val baseStepCount: Int? = null,
-        val previousStepCount: Int? = null,
-        val lastProcessedTimestamp: Instant = Instant.now()
-    )
-
     init {
         coroutineScope.launch {
             try {
@@ -38,40 +30,27 @@ class StepCounterController(
         }
     }
 
-    private suspend fun processStepCount(totalSteps: Int, currentTimestamp: Instant) {
-        val currentState = sensorState
-        
-        if (currentState.baseStepCount == null) {
-            Log.d(TAG, "Initializing step counter with base count: $totalSteps")
-            sensorState = currentState.copy(
-                baseStepCount = totalSteps,
-                previousStepCount = totalSteps
-            )
-            return
-        }
-
-        val stepIncrement = totalSteps - (currentState.previousStepCount ?: totalSteps)
-        if (stepIncrement > 0) {
-            Log.d(TAG, "Step count increased by: $stepIncrement")
-            sensorState = currentState.copy(
-                previousStepCount = totalSteps,
-                lastProcessedTimestamp = currentTimestamp
-            )
-            stepsDataStore.incrementSteps(currentTimestamp, stepIncrement)
-            updateState(currentTimestamp)
+    fun onStepCountChanged(sensorValue: Int, eventTimestamp: Instant) {
+        coroutineScope.launch {
+            try {
+                Log.d(TAG, "Received sensor value: $sensorValue at $eventTimestamp")
+                
+                // Store raw sensor value
+                stepsDataStore.storeSensorValue(eventTimestamp, sensorValue)
+                
+                // Update state with calculated steps
+                val startOfDay = TimeUtils.getStartOfDay(eventTimestamp)
+                val todaySteps = stepsDataStore.getTotalStepsInRange(startOfDay, eventTimestamp)
+                Log.d(TAG, "Calculated steps for today: $todaySteps")
+                updateState(eventTimestamp, todaySteps)
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to process step count change", e)
+            }
         }
     }
 
-    private suspend fun updateState(timestamp: Instant, totalSteps: Int? = null) {
-        val steps = totalSteps ?: run {
-            val startOfDay = TimeUtils.getStartOfDay(timestamp)
-            stepsDataStore.getTotalStepsInRange(startOfDay, timestamp)
-        }
-        
-        // Only update state if steps count has changed
-        if (steps != _state.value.steps) {
-            _state.value = StepCounterState(timestamp, steps)
-        }
+    private fun updateState(timestamp: Instant, steps: Int) {
+        _state.value = StepCounterState(timestamp, steps)
     }
 
     suspend fun getHistoricalSteps(timestamp: Instant): Int {
@@ -83,14 +62,9 @@ class StepCounterController(
         return stepsDataStore.getStepsInRange(startTimestamp, endTimestamp)
     }
 
-    fun onStepCountChanged(newStepCount: Int, eventTimestamp: Instant) {
-        coroutineScope.launch {
-            processStepCount(newStepCount, eventTimestamp)
-        }
-    }
-
     suspend fun onDateChanged(newTimestamp: Instant) {
-        sensorState = SensorState(lastProcessedTimestamp = newTimestamp)
-        updateState(newTimestamp)
+        val startOfDay = TimeUtils.getStartOfDay(newTimestamp)
+        val todaySteps = stepsDataStore.getTotalStepsInRange(startOfDay, newTimestamp)
+        updateState(newTimestamp, todaySteps)
     }
 } 

@@ -20,40 +20,28 @@ class StepsDataStore(context: Context) : Closeable {
 
     private val dao = database.stepsDao()
 
-    suspend fun loadStepsForTimestamp(timestamp: Instant): Int = withContext(Dispatchers.IO) {
-        try {
-            val truncatedTimestamp = TimeUtils.truncateToMinute(timestamp)
-            dao.getStepsForTimestamp(truncatedTimestamp.toString())?.steps ?: 0
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to load steps for timestamp", e)
-            0
-        }
-    }
-
-    suspend fun loadStepsForDate(date: LocalDate): Int = withContext(Dispatchers.IO) {
-        try {
-            val startOfDay = date.atStartOfDay(ZoneOffset.UTC).toInstant()
-            val endOfDay = TimeUtils.getEndOfDay(startOfDay)
-            dao.getTotalStepsInRange(startOfDay.toString(), endOfDay.toString()) ?: 0
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to load steps for date", e)
-            0
-        }
-    }
-
-    suspend fun incrementSteps(timestamp: Instant, increment: Int) {
-        if (increment <= 0) return
+    suspend fun storeSensorValue(timestamp: Instant, sensorValue: Int) {
         withContext(Dispatchers.IO) {
             try {
                 val truncatedTimestamp = TimeUtils.truncateToMinute(timestamp)
                 val timestampStr = truncatedTimestamp.toString()
                 
-                val currentSteps = dao.getStepsForTimestamp(timestampStr)?.steps ?: 0
-                val newSteps = currentSteps + increment
+                // Check if this is our first ever reading
+                val firstEntry = dao.getFirstEntry()
+                if (firstEntry == null) {
+                    Log.d(TAG, "First ever sensor reading: $sensorValue")
+                } else {
+                    val lastEntry = dao.getLastEntry()
+                    if (lastEntry != null) {
+                        val diff = sensorValue - lastEntry.steps
+                        Log.d(TAG, "Sensor increment since last reading: $diff (current: $sensorValue, last: ${lastEntry.steps})")
+                    }
+                }
                 
-                dao.insert(StepsEntity(timestampStr, newSteps))
+                Log.d(TAG, "Storing sensor value: $sensorValue for minute $timestampStr")
+                dao.insert(StepsEntity(timestampStr, sensorValue))
             } catch (e: Exception) {
-                Log.e(TAG, "Failed to increment steps", e)
+                Log.e(TAG, "Failed to store sensor value", e)
                 throw e
             }
         }
@@ -62,12 +50,31 @@ class StepsDataStore(context: Context) : Closeable {
     suspend fun getStepsInRange(startTimestamp: Instant, endTimestamp: Instant): Map<Instant, Int> = 
         withContext(Dispatchers.IO) {
             try {
-                dao.getStepsInRange(
+                val entries = dao.getStepsInRange(
                     startTimestamp.toString(),
                     endTimestamp.toString()
-                ).associate { entity ->
-                    Instant.parse(entity.timestamp) to entity.steps
+                )
+                
+                if (entries.isEmpty()) return@withContext emptyMap()
+                
+                // Get the last value before our range to properly calculate first increment
+                val lastBeforeRange = dao.getLastEntryBefore(startTimestamp.toString())
+                val initialValue = lastBeforeRange?.steps ?: entries.first().steps
+                
+                // Convert raw sensor values to step increments
+                val result = mutableMapOf<Instant, Int>()
+                var lastValue = initialValue
+                
+                for (entry in entries) {
+                    val currentValue = entry.steps
+                    val increment = if (currentValue >= lastValue) currentValue - lastValue else 0
+                    if (increment > 0) {
+                        result[Instant.parse(entry.timestamp)] = increment
+                    }
+                    lastValue = currentValue
                 }
+                
+                result
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to get steps in range", e)
                 emptyMap()
@@ -77,10 +84,12 @@ class StepsDataStore(context: Context) : Closeable {
     suspend fun getTotalStepsInRange(startTimestamp: Instant, endTimestamp: Instant): Int =
         withContext(Dispatchers.IO) {
             try {
-                dao.getTotalStepsInRange(
+                val steps = dao.getTotalStepsInRange(
                     startTimestamp.toString(),
                     endTimestamp.toString()
-                ) ?: 0
+                )
+                Log.d(TAG, "Got steps in range $startTimestamp to $endTimestamp: $steps")
+                steps
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to get total steps in range", e)
                 0
