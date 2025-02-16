@@ -75,4 +75,12 @@ export interface AndroidPedometerModule {
    * @throws {Error} If pedometer is not initialized or fails to setup background updates
    */
   setupBackgroundUpdates(config?: NotificationConfig): Promise<boolean>;
+
+  /**
+   * [FOR TESTING ONLY] Simulate a midnight reset by sending a time changed broadcast.
+   * This is useful for testing the midnight reset functionality without waiting for actual midnight.
+   * @returns Promise<boolean> - Returns true if the simulation was triggered successfully
+   * @throws {Error} If pedometer is not initialized
+   */
+  simulateMidnightReset(): Promise<boolean>;
 }

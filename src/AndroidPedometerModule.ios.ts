@@ -48,6 +48,11 @@ export function subscribeToChange(
   return () => {};
 }
 
+export function simulateMidnightReset(): Promise<boolean> {
+  console.warn(WARNING_MESSAGE);
+  return Promise.resolve(false);
+}
+
 export { AndroidPedometerModuleEvents, PermissionResponse };
 
 

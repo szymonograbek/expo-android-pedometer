@@ -6,6 +6,8 @@ import android.app.PendingIntent
 import android.app.Service
 import android.content.Context
 import android.content.Intent
+import android.content.BroadcastReceiver
+import android.content.IntentFilter
 import android.hardware.Sensor
 import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
@@ -22,6 +24,8 @@ class PedometerService : Service(), SensorEventListener {
     private lateinit var controller: StepCounterController
     private var isListening = false
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
+    private var currentDate = LocalDate.now()
+    private lateinit var midnightReceiver: MidnightChangeReceiver
 
     companion object {
         private const val NOTIFICATION_CHANNEL_ID = "pedometer_channel"
@@ -69,6 +73,17 @@ class PedometerService : Service(), SensorEventListener {
 
             sensorManager = getSystemService(Context.SENSOR_SERVICE) as SensorManager
             controller = StepCounterManager.getController(applicationContext, serviceScope)
+
+            // Register midnight broadcast receiver
+            midnightReceiver = MidnightChangeReceiver(
+                applicationContext,
+                serviceScope,
+                controller
+            ) {
+                // Service doesn't need to do anything special on midnight change
+                // as the controller already handles state updates
+            }
+            midnightReceiver.register()
 
             // Start foreground service with initial notification
             startForeground(NOTIFICATION_ID, createNotification(controller.state.value.steps).build())
@@ -212,6 +227,7 @@ class PedometerService : Service(), SensorEventListener {
             sensorManager.unregisterListener(this)
             isListening = false
         }
+        midnightReceiver.unregister()
         instance = null
         serviceScope.cancel()
         Log.d(TAG, "Service destroyed")

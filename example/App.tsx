@@ -1,4 +1,4 @@
-import {initialize, getStepsCountAsync, requestPermissions, setupBackgroundUpdates, requestNotificationPermissions, subscribeToChange, PedometerUpdateEventPayload} from 'android-pedometer';
+import {initialize, getStepsCountAsync, requestPermissions, setupBackgroundUpdates, requestNotificationPermissions, subscribeToChange, PedometerUpdateEventPayload, simulateMidnightReset} from 'android-pedometer';
 import { useEffect } from 'react';
 import { useState } from 'react';
 import { Button, SafeAreaView, Text, View, StyleSheet, Alert } from 'react-native';
@@ -84,6 +84,15 @@ export default function App() {
     }
   };
 
+  const handleSimulateMidnightReset = async () => {
+    try {
+      await simulateMidnightReset();
+      setError(null);
+    } catch (e) {
+      handleError(e);
+    }
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.content}>
@@ -105,6 +114,7 @@ export default function App() {
           <Button title="Request Permissions" onPress={handleRequestPermissions} />
           <Button title="Request Notification Permissions" onPress={handleRequestNotificationPermissions} />
           <Button title="Setup Background Updates With Notification" onPress={handleSetupBackgroundUpdates} />
+          <Button title="Simulate Midnight Reset" onPress={handleSimulateMidnightReset} />
         </View>
       </View>
     </SafeAreaView>

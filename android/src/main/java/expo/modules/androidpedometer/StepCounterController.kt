@@ -106,4 +106,16 @@ class StepCounterController(
         Log.d(TAG, "Step count changed: $newStepCount on $eventDate")
         rawStepSensorReadings.value = StepCounterEvent(newStepCount, eventDate)
     }
+
+    suspend fun onDateChanged(newDate: LocalDate) {
+        Log.d(TAG, "Date changed to: $newDate")
+        // Save current day's steps before resetting
+        stepsDataStore.incrementSteps(lastProcessedDate, todaySteps)
+        // Reset for new day
+        baseStepCount = null
+        previousStepCount = null
+        lastProcessedDate = newDate
+        todaySteps = 0
+        updateState(newDate)
+    }
 } 

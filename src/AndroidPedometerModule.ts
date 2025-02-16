@@ -13,6 +13,7 @@ const AndroidPedometer = requireNativeModule<{
   requestNotificationPermissions(): Promise<PermissionResponse>;
   setupBackgroundUpdates(config?: NotificationConfig): Promise<boolean>;
   addListener(eventName: string, listener: (event: any) => void): { remove: () => void };
+  simulateMidnightReset(): Promise<boolean>;
 }>('AndroidPedometer');
 
 export function initialize(): Promise<boolean> {
@@ -45,6 +46,10 @@ export function subscribeToChange(
   return () => {
     eventSubscription.remove();
   };
+}
+
+export function simulateMidnightReset(): Promise<boolean> {
+  return AndroidPedometer.simulateMidnightReset();
 }
 
 export { AndroidPedometerModuleEvents, PermissionResponse };

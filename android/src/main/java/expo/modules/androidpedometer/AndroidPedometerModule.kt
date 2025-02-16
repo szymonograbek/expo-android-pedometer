@@ -28,6 +28,8 @@ import expo.modules.androidpedometer.Constants.PEDOMETER_UPDATE_EVENT
 import expo.modules.androidpedometer.Constants.ACTION_START_SERVICE
 import expo.modules.androidpedometer.Constants.ACTION_PAUSE_COUNTING
 import expo.modules.androidpedometer.Constants.ACTION_RESUME_COUNTING
+import android.content.BroadcastReceiver
+import android.content.IntentFilter
 
 private const val TAG = "AndroidPedometerModule"
 
@@ -54,6 +56,8 @@ class AndroidPedometerModule : Module() {
     private val moduleScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     private val dateFormatter = DateTimeFormatter.ISO_LOCAL_DATE
     private lateinit var controller: StepCounterController
+    private lateinit var midnightReceiver: MidnightChangeReceiver
+    private var currentDate = LocalDate.now()
 
     private val sensorEventListener = object : SensorEventListener {
         override fun onSensorChanged(event: SensorEvent) {
@@ -100,6 +104,22 @@ class AndroidPedometerModule : Module() {
             try {
                 if (!isInitialized) {
                     controller = StepCounterManager.getController(appContext.reactContext!!, moduleScope)
+                    
+                    // Initialize and register midnight receiver
+                    midnightReceiver = MidnightChangeReceiver(
+                        appContext.reactContext!!,
+                        moduleScope,
+                        controller
+                    ) {
+                        // This will be called after midnight change
+                        val currentSteps = controller.state.value.steps
+                        Log.d(TAG, "Midnight change, emitting update with steps: $currentSteps")
+                        sendEvent(PEDOMETER_UPDATE_EVENT, mapOf(
+                            "steps" to currentSteps,
+                            "timestamp" to System.currentTimeMillis()
+                        ))
+                    }
+                    midnightReceiver.register()
                     
                     sensorManager = appContext.reactContext?.getSystemService(Context.SENSOR_SERVICE) as? SensorManager
                     stepCountSensor = sensorManager?.getDefaultSensor(Sensor.TYPE_STEP_COUNTER)
@@ -266,8 +286,38 @@ class AndroidPedometerModule : Module() {
             }
         }
 
+        AsyncFunction("simulateMidnightReset") { promise: Promise ->
+            try {
+                if (!isInitialized) {
+                    throw PedometerError("Pedometer not initialized. Call initialize() first")
+                }
+
+                moduleScope.launch {
+                    try {
+                        // Directly trigger date change handling
+                        controller.onDateChanged(LocalDate.now())
+                        
+                        // Emit event with updated steps
+                        val currentSteps = controller.state.value.steps
+                        Log.d(TAG, "Emitting steps update after midnight reset: $currentSteps")
+                        sendEvent(PEDOMETER_UPDATE_EVENT, mapOf(
+                            "steps" to currentSteps,
+                            "timestamp" to System.currentTimeMillis()
+                        ))
+                        
+                        promise.resolve(true)
+                    } catch (e: Exception) {
+                        promise.reject(PedometerError("Failed to simulate midnight reset: ${e.message}"))
+                    }
+                }
+            } catch (e: Exception) {
+                promise.reject(PedometerError("Failed to simulate midnight reset: ${e.message}"))
+            }
+        }
+
         OnDestroy {
             sensorManager?.unregisterListener(sensorEventListener)
+            midnightReceiver.unregister()
             resumeServiceCounting() // Resume service counting when module is destroyed
             isInitialized = false
             StepCounterManager.reset()
