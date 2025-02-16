@@ -20,6 +20,17 @@ const withPedometer: ConfigPlugin<{} | void> = (config) => {
       AndroidConfig.Permissions.addPermission(config.modResults, permission);
     });
 
+    // Add step counter feature
+    if (!config.modResults.manifest['uses-feature']) {
+      config.modResults.manifest['uses-feature'] = [];
+    }
+    config.modResults.manifest['uses-feature'].push({
+      $: {
+        'android:name': 'android.hardware.sensor.stepcounter',
+        'android:required': 'true',
+      },
+    });
+
     // Add PedometerService
     const serviceElement = {
       $: {
@@ -30,8 +41,32 @@ const withPedometer: ConfigPlugin<{} | void> = (config) => {
       },
     } as const;
 
+    // Add PedometerServiceLauncher receiver
+    const receiverElement = {
+      $: {
+        'android:name': 'expo.modules.androidpedometer.PedometerServiceLauncher',
+        'android:enabled': 'true' as const,
+        'android:exported': 'false' as const,
+      },
+      'intent-filter': [{
+        action: [{
+          $: {
+            'android:name': 'android.intent.action.BOOT_COMPLETED',
+          },
+        }],
+        category: [{
+          $: {
+            'android:name': 'android.intent.category.DEFAULT',
+          },
+        }],
+      }],
+    };
+
     mainApplication.service = mainApplication.service || [];
     mainApplication.service.push(serviceElement);
+
+    mainApplication.receiver = mainApplication.receiver || [];
+    mainApplication.receiver.push(receiverElement);
 
     return config;
   });

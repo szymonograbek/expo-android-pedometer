@@ -9,6 +9,7 @@
   <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW"/>
   <uses-permission android:name="android.permission.VIBRATE"/>
   <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"/>
+  <uses-feature android:name="android.hardware.sensor.stepcounter" android:required="true"/>
   <queries>
     <intent>
       <action android:name="android.intent.action.VIEW"/>
@@ -33,5 +34,11 @@
         <data android:scheme="expo.modules.androidpedometer.example"/>
       </intent-filter>
     </activity>
+    <receiver android:name="expo.modules.androidpedometer.PedometerServiceLauncher" android:enabled="true" android:exported="false">
+      <intent-filter>
+        <action android:name="android.intent.action.BOOT_COMPLETED"/>
+        <category android:name="android.intent.category.DEFAULT"/>
+      </intent-filter>
+    </receiver>
   </application>
 </manifest>

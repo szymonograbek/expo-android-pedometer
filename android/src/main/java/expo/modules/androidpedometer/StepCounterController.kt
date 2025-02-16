@@ -67,7 +67,11 @@ class StepCounterController(
             val startOfDay = TimeUtils.getStartOfDay(timestamp)
             stepsDataStore.getTotalStepsInRange(startOfDay, timestamp)
         }
-        _state.value = StepCounterState(timestamp, steps)
+        
+        // Only update state if steps count has changed
+        if (steps != _state.value.steps) {
+            _state.value = StepCounterState(timestamp, steps)
+        }
     }
 
     suspend fun getHistoricalSteps(timestamp: Instant): Int {
