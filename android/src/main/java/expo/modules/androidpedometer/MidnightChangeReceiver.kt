@@ -7,7 +7,9 @@ import android.content.IntentFilter
 import android.util.Log
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
-import java.time.LocalDate
+import java.time.Instant
+import java.time.ZoneOffset
+import java.time.temporal.ChronoUnit
 
 private const val TAG = "MidnightChangeReceiver"
 
@@ -17,15 +19,16 @@ class MidnightChangeReceiver(
     private val controller: StepCounterController,
     private val onMidnightChange: suspend () -> Unit
 ) : BroadcastReceiver() {
-    private var currentDate = LocalDate.now()
+    private var lastProcessedDay = Instant.now().truncatedTo(ChronoUnit.DAYS)
     private var isRegistered = false
 
     override fun onReceive(context: Context?, intent: Intent?) {
-        val today = LocalDate.now()
-        if (today != currentDate) {
-            currentDate = today
+        val now = Instant.now()
+        val currentDay = now.truncatedTo(ChronoUnit.DAYS)
+        if (currentDay != lastProcessedDay) {
+            lastProcessedDay = currentDay
             coroutineScope.launch {
-                controller.onDateChanged(today)
+                controller.onDateChanged(now)
                 onMidnightChange()
             }
         }
@@ -40,7 +43,6 @@ class MidnightChangeReceiver(
             }
             context.registerReceiver(this, intentFilter)
             isRegistered = true
-            Log.d(TAG, "Midnight receiver registered")
         }
     }
 
@@ -49,9 +51,8 @@ class MidnightChangeReceiver(
             try {
                 context.unregisterReceiver(this)
                 isRegistered = false
-                Log.d(TAG, "Midnight receiver unregistered")
             } catch (e: Exception) {
-                Log.e(TAG, "Error unregistering midnight receiver: ${e.message}")
+                Log.e(TAG, "Failed to unregister midnight receiver", e)
             }
         }
     }

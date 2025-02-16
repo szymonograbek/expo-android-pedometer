@@ -1,26 +1,25 @@
 package expo.modules.androidpedometer
 
 import androidx.room.*
-import java.time.LocalDate
+import java.time.Instant
 
 @Dao
 interface StepsDao {
-    @Query("SELECT * FROM steps WHERE date = :date")
-    suspend fun getStepsForDate(date: String): StepsEntity?
+    @Query("SELECT * FROM steps WHERE timestamp = :timestamp")
+    suspend fun getStepsForTimestamp(timestamp: String): StepsEntity?
 
-    @Query("SELECT * FROM steps WHERE date BETWEEN :startDate AND :endDate")
-    suspend fun getStepsInRange(startDate: String, endDate: String): List<StepsEntity>
+    @Query("SELECT * FROM steps WHERE timestamp BETWEEN :startTimestamp AND :endTimestamp")
+    suspend fun getStepsInRange(startTimestamp: String, endTimestamp: String): List<StepsEntity>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insert(stepsEntity: StepsEntity)
 
-    @Query("UPDATE steps SET steps = steps + :increment WHERE date = :date")
-    suspend fun incrementSteps(date: String, increment: Int)
+    @Query("SELECT SUM(steps) FROM steps WHERE timestamp BETWEEN :startTimestamp AND :endTimestamp")
+    suspend fun getTotalStepsInRange(startTimestamp: String, endTimestamp: String): Int?
 }
 
 @Entity(tableName = "steps")
 data class StepsEntity(
-    @PrimaryKey val date: String,
-    val steps: Int,
-    val timestamp: Long
+    @PrimaryKey val timestamp: String, // ISO timestamp with UTC timezone
+    val steps: Int // Now represents incremental steps in this minute
 ) 

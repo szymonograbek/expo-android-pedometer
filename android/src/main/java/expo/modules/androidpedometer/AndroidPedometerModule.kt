@@ -16,10 +16,8 @@ import expo.modules.kotlin.modules.Module
 import expo.modules.kotlin.modules.ModuleDefinition
 import expo.modules.kotlin.records.Record
 import expo.modules.kotlin.records.Field
-import java.time.LocalDate
 import android.content.Intent
 import android.util.Log
-import java.time.format.DateTimeFormatter
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -30,6 +28,8 @@ import expo.modules.androidpedometer.Constants.ACTION_PAUSE_COUNTING
 import expo.modules.androidpedometer.Constants.ACTION_RESUME_COUNTING
 import android.content.BroadcastReceiver
 import android.content.IntentFilter
+import java.time.Instant
+import java.time.temporal.ChronoUnit
 
 private const val TAG = "AndroidPedometerModule"
 
@@ -54,28 +54,14 @@ class AndroidPedometerModule : Module() {
     private var stepCountSensor: Sensor? = null
     private var isInitialized = false
     private val moduleScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
-    private val dateFormatter = DateTimeFormatter.ISO_LOCAL_DATE
     private lateinit var controller: StepCounterController
     private lateinit var midnightReceiver: MidnightChangeReceiver
-    private var currentDate = LocalDate.now()
+    private var currentTimestamp = Instant.now()
 
     private val sensorEventListener = object : SensorEventListener {
         override fun onSensorChanged(event: SensorEvent) {
             val steps = event.values[0].toInt()
-            controller.onStepCountChanged(steps, LocalDate.now())
-            
-            moduleScope.launch {
-                try {
-                    val currentSteps = controller.state.value.steps
-                    Log.d(TAG, "Current steps: $currentSteps")
-                    sendEvent(PEDOMETER_UPDATE_EVENT, mapOf(
-                        "steps" to currentSteps,
-                        "timestamp" to System.currentTimeMillis()
-                    ))
-                } catch (e: Exception) {
-                    Log.e(TAG, "Error updating steps: ${e.message}")
-                }
-            }
+            controller.onStepCountChanged(steps, Instant.now())
         }
 
         override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {}
@@ -111,44 +97,59 @@ class AndroidPedometerModule : Module() {
                         moduleScope,
                         controller
                     ) {
-                        // This will be called after midnight change
                         val currentSteps = controller.state.value.steps
-                        Log.d(TAG, "Midnight change, emitting update with steps: $currentSteps")
+                        Log.d(TAG, "Midnight change detected, steps: $currentSteps")
                         sendEvent(PEDOMETER_UPDATE_EVENT, mapOf(
                             "steps" to currentSteps,
-                            "timestamp" to System.currentTimeMillis()
+                            "timestamp" to controller.state.value.timestamp.toString()
                         ))
                     }
                     midnightReceiver.register()
                     
-                    sensorManager = appContext.reactContext?.getSystemService(Context.SENSOR_SERVICE) as? SensorManager
-                    stepCountSensor = sensorManager?.getDefaultSensor(Sensor.TYPE_STEP_COUNTER)
+                    // Only register sensor listener if service is not running
+                    if (PedometerService.instance == null) {
+                        sensorManager = appContext.reactContext?.getSystemService(Context.SENSOR_SERVICE) as? SensorManager
+                        stepCountSensor = sensorManager?.getDefaultSensor(Sensor.TYPE_STEP_COUNTER)
 
-                    if (stepCountSensor == null) {
-                        throw PedometerError("Step counter sensor not available on this device")
+                        if (stepCountSensor == null) {
+                            throw PedometerError("Step counter sensor not available on this device")
+                        }
+
+                        val result = sensorManager?.registerListener(
+                            sensorEventListener,
+                            stepCountSensor,
+                            SensorManager.SENSOR_DELAY_NORMAL
+                        ) ?: false
+
+                        if (!result) {
+                            throw PedometerError("Failed to register sensor listener")
+                        }
                     }
 
-                    val result = sensorManager?.registerListener(
-                        sensorEventListener,
-                        stepCountSensor,
-                        SensorManager.SENSOR_DELAY_NORMAL
-                    ) ?: false
-
-                    if (!result) {
-                        throw PedometerError("Failed to register sensor listener")
+                    // Start collecting state changes
+                    moduleScope.launch {
+                        controller.state.collect { state ->
+                            try {
+                                sendEvent(PEDOMETER_UPDATE_EVENT, mapOf(
+                                    "steps" to state.steps,
+                                    "timestamp" to state.timestamp.toString()
+                                ))
+                            } catch (e: Exception) {
+                                Log.e(TAG, "Failed to send step update event", e)
+                            }
+                        }
                     }
 
                     // Get initial steps immediately after initialization
                     moduleScope.launch {
                         try {
                             val initialSteps = controller.state.value.steps
-                            Log.d(TAG, "Initial steps: $initialSteps")
                             sendEvent(PEDOMETER_UPDATE_EVENT, mapOf(
                                 "steps" to initialSteps,
-                                "timestamp" to System.currentTimeMillis()
+                                "timestamp" to controller.state.value.timestamp.toString()
                             ))
                         } catch (e: Exception) {
-                            Log.e(TAG, "Error getting initial steps: ${e.message}")
+                            Log.e(TAG, "Failed to get initial steps", e)
                         }
                     }
 
@@ -161,36 +162,56 @@ class AndroidPedometerModule : Module() {
             }
         }
 
-        AsyncFunction("getStepsCountAsync") { date: String?, promise: Promise ->
+        AsyncFunction("getStepsCountAsync") { timestamp: String?, promise: Promise ->
             try {
                 if (!isInitialized) {
                     throw PedometerError("Pedometer not initialized. Call initialize() first")
                 }
                 
-                val targetDate = if (date != null) {
-                    LocalDate.parse(date, dateFormatter)
+                val targetTimestamp = if (timestamp != null) {
+                    Instant.parse(timestamp)
                 } else {
-                    LocalDate.now()
+                    Instant.now()
                 }
 
                 moduleScope.launch {
                     try {
-                        val steps = if (targetDate == LocalDate.now()) {
-                            // For today, use the current state from controller
-                            controller.state.value.steps
-                        } else {
-                            // For historical data, get it from the database
-                            controller.getHistoricalSteps(targetDate)
-                        }
-                        Log.d(TAG, "Retrieved steps for ${targetDate}: $steps")
+                        val steps = controller.getHistoricalSteps(targetTimestamp)
+                        Log.d(TAG, "Retrieved steps for ${targetTimestamp}: $steps")
                         promise.resolve(steps)
                     } catch (e: Exception) {
-                        Log.e(TAG, "Error getting steps for ${targetDate}: ${e.message}")
+                        Log.e(TAG, "Error getting steps for ${targetTimestamp}: ${e.message}")
                         promise.reject(PedometerError("Failed to get steps count: ${e.message}"))
                     }
                 }
             } catch (e: Exception) {
                 promise.reject(PedometerError("Failed to get steps count: ${e.message}"))
+            }
+        }
+
+        AsyncFunction("getStepsCountInRangeAsync") { startTimestamp: String, endTimestamp: String, promise: Promise ->
+            try {
+                if (!isInitialized) {
+                    throw PedometerError("Pedometer not initialized. Call initialize() first")
+                }
+                
+                val start = Instant.parse(startTimestamp)
+                val end = Instant.parse(endTimestamp)
+
+                moduleScope.launch {
+                    try {
+                        val stepsMap = controller.getStepsInRange(start, end)
+                        Log.d(TAG, "Retrieved steps for range ${start} to ${end}: $stepsMap")
+                        // Convert Instant keys to ISO strings for JavaScript
+                        val result = stepsMap.mapKeys { it.key.toString() }
+                        promise.resolve(result)
+                    } catch (e: Exception) {
+                        Log.e(TAG, "Error getting steps for range ${start} to ${end}: ${e.message}")
+                        promise.reject(PedometerError("Failed to get steps count in range: ${e.message}"))
+                    }
+                }
+            } catch (e: Exception) {
+                promise.reject(PedometerError("Failed to get steps count in range: ${e.message}"))
             }
         }
 
@@ -294,15 +315,17 @@ class AndroidPedometerModule : Module() {
 
                 moduleScope.launch {
                     try {
-                        // Directly trigger date change handling
-                        controller.onDateChanged(LocalDate.now())
+                        // Get today's midnight timestamp in UTC
+                        val todayMidnight = Instant.now()
+                            .truncatedTo(ChronoUnit.DAYS)
+                        controller.onDateChanged(todayMidnight)
                         
                         // Emit event with updated steps
                         val currentSteps = controller.state.value.steps
                         Log.d(TAG, "Emitting steps update after midnight reset: $currentSteps")
                         sendEvent(PEDOMETER_UPDATE_EVENT, mapOf(
                             "steps" to currentSteps,
-                            "timestamp" to System.currentTimeMillis()
+                            "timestamp" to controller.state.value.timestamp.toString()
                         ))
                         
                         promise.resolve(true)

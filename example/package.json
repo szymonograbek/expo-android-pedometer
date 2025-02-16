@@ -10,9 +10,11 @@
     "web": "expo start --web"
   },
   "dependencies": {
+    "date-fns": "^4.1.0",
     "expo": "~52.0.33",
     "react": "18.3.1",
-    "react-native": "0.76.7"
+    "react-native": "0.76.7",
+    "react-native-date-picker": "^5.0.10"
   },
   "devDependencies": {
     "@babel/core": "^7.25.2",

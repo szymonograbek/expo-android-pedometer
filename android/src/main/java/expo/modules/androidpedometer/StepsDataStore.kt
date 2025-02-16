@@ -2,63 +2,92 @@ package expo.modules.androidpedometer
 
 import android.content.Context
 import androidx.room.Room
+import android.util.Log
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.withContext
-import java.time.LocalDate
-import java.time.format.DateTimeFormatter
+import java.time.*
+import java.io.Closeable
 
-class StepsDataStore(context: Context) {
+private const val TAG = "StepsDataStore"
+
+class StepsDataStore(context: Context) : Closeable {
     private val database = Room.databaseBuilder(
         context,
         StepsDatabase::class.java,
         "steps_database"
-    ).build()
+    ).fallbackToDestructiveMigration()
+        .build()
 
     private val dao = database.stepsDao()
-    private val dateFormatter = DateTimeFormatter.ISO_LOCAL_DATE
 
-    private val _stepsFlow = MutableStateFlow<Map<LocalDate, Int>>(emptyMap())
-    val stepsFlow: StateFlow<Map<LocalDate, Int>> = _stepsFlow.asStateFlow()
-
-    suspend fun loadStepsData(date: LocalDate): Int = withContext(Dispatchers.IO) {
-        val dateStr = date.format(dateFormatter)
-        dao.getStepsForDate(dateStr)?.steps ?: 0
+    suspend fun loadStepsForTimestamp(timestamp: Instant): Int = withContext(Dispatchers.IO) {
+        try {
+            val truncatedTimestamp = TimeUtils.truncateToMinute(timestamp)
+            dao.getStepsForTimestamp(truncatedTimestamp.toString())?.steps ?: 0
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to load steps for timestamp", e)
+            0
+        }
     }
 
-    suspend fun incrementSteps(date: LocalDate, increment: Int) {
+    suspend fun loadStepsForDate(date: LocalDate): Int = withContext(Dispatchers.IO) {
+        try {
+            val startOfDay = date.atStartOfDay(ZoneOffset.UTC).toInstant()
+            val endOfDay = TimeUtils.getEndOfDay(startOfDay)
+            dao.getTotalStepsInRange(startOfDay.toString(), endOfDay.toString()) ?: 0
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to load steps for date", e)
+            0
+        }
+    }
+
+    suspend fun incrementSteps(timestamp: Instant, increment: Int) {
         if (increment <= 0) return
-
         withContext(Dispatchers.IO) {
-            val dateStr = date.format(dateFormatter)
-            val currentEntity = dao.getStepsForDate(dateStr)
-            
-            if (currentEntity == null) {
-                // First entry for this date
-                dao.insert(StepsEntity(
-                    date = dateStr,
-                    steps = increment,
-                    timestamp = System.currentTimeMillis()
-                ))
-            } else {
-                dao.incrementSteps(dateStr, increment)
+            try {
+                val truncatedTimestamp = TimeUtils.truncateToMinute(timestamp)
+                val timestampStr = truncatedTimestamp.toString()
+                
+                val currentSteps = dao.getStepsForTimestamp(timestampStr)?.steps ?: 0
+                val newSteps = currentSteps + increment
+                
+                dao.insert(StepsEntity(timestampStr, newSteps))
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to increment steps", e)
+                throw e
             }
-
-            // Update flow
-            val updatedSteps = dao.getStepsForDate(dateStr)?.steps ?: 0
-            _stepsFlow.value = _stepsFlow.value + (date to updatedSteps)
         }
     }
 
-    suspend fun getStepsInRange(startDate: LocalDate, endDate: LocalDate): Map<LocalDate, Int> = 
+    suspend fun getStepsInRange(startTimestamp: Instant, endTimestamp: Instant): Map<Instant, Int> = 
         withContext(Dispatchers.IO) {
-            dao.getStepsInRange(
-                startDate.format(dateFormatter),
-                endDate.format(dateFormatter)
-            ).associate { entity ->
-                LocalDate.parse(entity.date, dateFormatter) to entity.steps
+            try {
+                dao.getStepsInRange(
+                    startTimestamp.toString(),
+                    endTimestamp.toString()
+                ).associate { entity ->
+                    Instant.parse(entity.timestamp) to entity.steps
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to get steps in range", e)
+                emptyMap()
             }
         }
+
+    suspend fun getTotalStepsInRange(startTimestamp: Instant, endTimestamp: Instant): Int =
+        withContext(Dispatchers.IO) {
+            try {
+                dao.getTotalStepsInRange(
+                    startTimestamp.toString(),
+                    endTimestamp.toString()
+                ) ?: 0
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to get total steps in range", e)
+                0
+            }
+        }
+
+    override fun close() {
+        database.close()
+    }
 } 

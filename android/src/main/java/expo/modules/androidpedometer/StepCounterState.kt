@@ -1,9 +1,8 @@
 package expo.modules.androidpedometer
 
-import java.time.LocalDate
+import java.time.Instant
 
 data class StepCounterState(
-    val date: LocalDate,
-    val steps: Int,
-    val timestamp: Long
+    val timestamp: Instant,
+    val steps: Int
 ) 

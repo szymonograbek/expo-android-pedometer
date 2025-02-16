@@ -17,14 +17,17 @@ import android.os.IBinder
 import androidx.core.app.NotificationCompat
 import android.util.Log
 import kotlinx.coroutines.*
-import java.time.LocalDate
+import java.time.Instant
+import java.time.temporal.ChronoUnit
+import expo.modules.androidpedometer.Constants.ACTION_PAUSE_COUNTING
+import expo.modules.androidpedometer.Constants.ACTION_RESUME_COUNTING
 
 class PedometerService : Service(), SensorEventListener {
     private lateinit var sensorManager: SensorManager
     private lateinit var controller: StepCounterController
     private var isListening = false
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
-    private var currentDate = LocalDate.now()
+    private var lastProcessedTimestamp = Instant.now()
     private lateinit var midnightReceiver: MidnightChangeReceiver
 
     companion object {
@@ -35,7 +38,9 @@ class PedometerService : Service(), SensorEventListener {
             title = "Step Counter Active",
             contentTemplate = null
         )
-        private var instance: PedometerService? = null
+        @Volatile
+        var instance: PedometerService? = null
+            private set
 
         fun setNotificationConfig(config: NotificationConfig) {
             notificationConfig = NotificationConfig(
@@ -63,68 +68,81 @@ class PedometerService : Service(), SensorEventListener {
 
     override fun onCreate() {
         super.onCreate()
-        Log.d(TAG, "Service onCreate started")
         instance = this
-
         try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 createNotificationChannel()
             }
-
             sensorManager = getSystemService(Context.SENSOR_SERVICE) as SensorManager
             controller = StepCounterManager.getController(applicationContext, serviceScope)
-
-            // Register midnight broadcast receiver
             midnightReceiver = MidnightChangeReceiver(
                 applicationContext,
                 serviceScope,
                 controller
-            ) {
-                // Service doesn't need to do anything special on midnight change
-                // as the controller already handles state updates
-            }
+            ) {}
             midnightReceiver.register()
-
-            // Start foreground service with initial notification
             startForeground(NOTIFICATION_ID, createNotification(controller.state.value.steps).build())
-
-            // Monitor state for notification updates
             serviceScope.launch {
                 controller.state.collect { state ->
                     updateNotification(state.steps)
                 }
             }
-
             registerStepCounter()
-            Log.d(TAG, "Service onCreate completed successfully")
         } catch (e: Exception) {
-            Log.e(TAG, "Error in onCreate: ${e.message}", e)
-            stopSelf()
-        }
-    }
-
-    private fun registerStepCounter() {
-        val stepCounterSensor: Sensor? = sensorManager.getDefaultSensor(Sensor.TYPE_STEP_COUNTER)
-        stepCounterSensor?.let {
-            val result = sensorManager.registerListener(
-                this,
-                it,
-                SensorManager.SENSOR_DELAY_NORMAL
-            )
-            isListening = result
-            Log.d(TAG, "Step counter registered, success=$result")
-        } ?: run {
-            Log.e(TAG, "Step counter sensor not available")
+            Log.e(TAG, "Failed to initialize service", e)
             stopSelf()
         }
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        // Update notification when service is restarted
-        if (this::controller.isInitialized) {
-            updateCurrentNotification()
+        try {
+            when (intent?.action) {
+                ACTION_PAUSE_COUNTING -> {
+                    if (isListening) {
+                        sensorManager.unregisterListener(this)
+                        isListening = false
+                        Log.d(TAG, "Step counter paused")
+                    }
+                }
+                ACTION_RESUME_COUNTING -> {
+                    if (!isListening) {
+                        registerStepCounter()
+                        Log.d(TAG, "Step counter resumed")
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error in onStartCommand", e)
         }
         return START_STICKY
+    }
+
+    private fun registerStepCounter(): Boolean {
+        val stepCounterSensor: Sensor? = sensorManager.getDefaultSensor(Sensor.TYPE_STEP_COUNTER)
+        return stepCounterSensor?.let { sensor ->
+            try {
+                val result = sensorManager.registerListener(
+                    this,
+                    sensor,
+                    SensorManager.SENSOR_DELAY_NORMAL
+                )
+                if (result) {
+                    isListening = true
+                } else {
+                    Log.e(TAG, "Failed to register step counter sensor")
+                    stopSelf()
+                }
+                result
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to register step counter sensor", e)
+                stopSelf()
+                false
+            }
+        } ?: run {
+            Log.e(TAG, "Step counter sensor not available")
+            stopSelf()
+            false
+        }
     }
 
     override fun onBind(intent: Intent?): IBinder? = null
@@ -132,7 +150,7 @@ class PedometerService : Service(), SensorEventListener {
     override fun onSensorChanged(event: SensorEvent?) {
         event?.let {
             val steps = it.values[0].toInt()
-            controller.onStepCountChanged(steps, LocalDate.now())
+            controller.onStepCountChanged(steps, Instant.now())
         }
     }
 
@@ -209,7 +227,7 @@ class PedometerService : Service(), SensorEventListener {
             val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
             notificationManager.notify(NOTIFICATION_ID, notification)
         } catch (e: Exception) {
-            Log.e(TAG, "Error updating notification: ${e.message}", e)
+            Log.e(TAG, "Failed to update notification", e)
         }
     }
 
@@ -217,19 +235,24 @@ class PedometerService : Service(), SensorEventListener {
         try {
             updateNotification(controller.state.value.steps)
         } catch (e: Exception) {
-            Log.e(TAG, "Error updating current notification: ${e.message}", e)
+            Log.e(TAG, "Error updating current notification", e)
         }
     }
 
     override fun onDestroy() {
-        super.onDestroy()
-        if (isListening) {
-            sensorManager.unregisterListener(this)
-            isListening = false
+        try {
+            super.onDestroy()
+            if (isListening) {
+                sensorManager.unregisterListener(this)
+                isListening = false
+            }
+            midnightReceiver.unregister()
+            synchronized(PedometerService::class.java) {
+                instance = null
+            }
+            serviceScope.cancel()
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to destroy service", e)
         }
-        midnightReceiver.unregister()
-        instance = null
-        serviceScope.cancel()
-        Log.d(TAG, "Service destroyed")
     }
 } 

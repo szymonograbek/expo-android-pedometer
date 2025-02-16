@@ -52,6 +52,15 @@ export interface AndroidPedometerModule {
   getStepsCountAsync(date?: string): Promise<number>;
 
   /**
+   * Get the step counts for a specific time range.
+   * @param startTimestamp ISO timestamp string for the start of the range
+   * @param endTimestamp ISO timestamp string for the end of the range
+   * @returns Promise<Record<string, number>> - Returns a map of ISO timestamps to step counts for each minute in the range
+   * @throws {Error} If pedometer is not initialized or fails to get step counts
+   */
+  getStepsCountInRangeAsync(startTimestamp: string, endTimestamp: string): Promise<Record<string, number>>;
+
+  /**
    * Request necessary permissions for step counting.
    * On Android Q (API 29) and above, this will request ACTIVITY_RECOGNITION permission.
    * On earlier versions, this will automatically return granted status.

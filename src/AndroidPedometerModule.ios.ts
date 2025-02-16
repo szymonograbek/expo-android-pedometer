@@ -53,6 +53,11 @@ export function simulateMidnightReset(): Promise<boolean> {
   return Promise.resolve(false);
 }
 
+export function getStepsCountInRangeAsync(startTimestamp: string, endTimestamp: string): Promise<Record<string, number>> {
+  console.warn(WARNING_MESSAGE);
+  return Promise.resolve({});
+}
+
 export { AndroidPedometerModuleEvents, PermissionResponse };
 
 
