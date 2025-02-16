@@ -53,10 +53,6 @@ export function subscribeToChange(
   };
 }
 
-export function simulateMidnightReset(): Promise<boolean> {
-  return AndroidPedometer.simulateMidnightReset();
-}
-
 export { AndroidPedometerModuleEvents, PermissionResponse };
 
 

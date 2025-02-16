@@ -48,11 +48,6 @@ export function subscribeToChange(
   return () => {};
 }
 
-export function simulateMidnightReset(): Promise<boolean> {
-  console.warn(WARNING_MESSAGE);
-  return Promise.resolve(false);
-}
-
 export function getStepsCountInRangeAsync(startTimestamp: string, endTimestamp: string): Promise<Record<string, number>> {
   console.warn(WARNING_MESSAGE);
   return Promise.resolve({});

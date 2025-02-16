@@ -3,6 +3,7 @@
     xmlns:tools="http://schemas.android.com/tools">
     <uses-permission android:name="android.permission.ACTIVITY_RECOGNITION" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_HEALTH" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
 
@@ -12,13 +13,13 @@
 
     <application>
         <service
-            android:name=".PedometerService"
+            android:name=".service.StepCounterService"
             android:enabled="true"
             android:exported="false"
             android:foregroundServiceType="health" />
 
         <receiver
-            android:name=".PedometerServiceLauncher"
+            android:name=".service.StepCounterServiceLauncher"
             android:enabled="true"
             android:exported="false">
             <intent-filter>

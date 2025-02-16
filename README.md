@@ -15,6 +15,58 @@ A native Android pedometer module for Expo/React Native applications that provid
 ```bash
 npx expo install expo-android-pedometer
 ```
+
+Add the following to your app's `AndroidManifest.xml`:
+
+```xml
+<manifest>
+    <!-- Step counter permissions -->
+    <uses-permission android:name="android.permission.ACTIVITY_RECOGNITION" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_HEALTH" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+
+    <!-- Step counter sensor feature -->
+    <uses-feature 
+        android:name="android.hardware.sensor.stepcounter"
+        android:required="true" />
+
+    <application>
+        <!-- Step counter service -->
+        <service 
+            android:name="expo.modules.androidpedometer.service.StepCounterService"
+            android:enabled="true"
+            android:exported="false"
+            android:foregroundServiceType="health" />
+
+        <!-- Boot receiver for auto-start -->
+        <receiver
+            android:name="expo.modules.androidpedometer.service.StepCounterServiceLauncher"
+            android:enabled="true"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </receiver>
+    </application>
+</manifest>
+```
+
+These additions are required for:
+- **Permissions**:
+  - `ACTIVITY_RECOGNITION`: Access to step counter sensor (Android 10+)
+  - `FOREGROUND_SERVICE`: Running the step counter service in the background
+  - `FOREGROUND_SERVICE_HEALTH`: Required for health-related foreground services (Android 14+)
+  - `POST_NOTIFICATIONS`: Showing the persistent notification (Android 13+)
+  - `RECEIVE_BOOT_COMPLETED`: Auto-starting the service after device reboot
+
+- **Service Declaration**: Required for the background step counting service
+- **Receiver Declaration**: Required for auto-starting the service after device reboot
+
+The `uses-feature` declaration ensures that the app will only be installable on devices that have a step counter sensor.
+
 ## API
 
 ### Methods

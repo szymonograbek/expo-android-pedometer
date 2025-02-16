@@ -6,7 +6,6 @@ import {
   requestNotificationPermissions,
   subscribeToChange,
   PedometerUpdateEventPayload,
-  simulateMidnightReset,
   getStepsCountInRangeAsync,
 } from "android-pedometer";
 import { useEffect } from "react";
@@ -19,16 +18,12 @@ import {
   StyleSheet,
   Alert,
   ScrollView,
-  Platform,
 } from "react-native";
 import {
   endOfDay,
   format,
   formatISO,
-  setDate,
-  setHours,
   startOfDay,
-  subDays,
 } from "date-fns";
 import DatePicker from "react-native-date-picker";
 
@@ -49,7 +44,7 @@ export default function App() {
     const subscription = subscribeToChange(
       (event: PedometerUpdateEventPayload) => {
         console.log("event", event);
-        setStepsCount(event.steps);
+        setStepsCount(prev => prev + event.steps);
       }
     );
     return () => subscription();
@@ -75,6 +70,9 @@ export default function App() {
       const steps = await getStepsCountAsync(
         startOfDay(new Date()).toISOString()
       );
+
+      console.log({steps})
+
       setStepsCount(steps);
 
       await handleGetStepsInRange();
@@ -116,15 +114,6 @@ export default function App() {
         contentTemplate: "Steps today: %d. Keep it up!",
         style: "bigText",
       });
-      setError(null);
-    } catch (e) {
-      handleError(e);
-    }
-  };
-
-  const handleSimulateMidnightReset = async () => {
-    try {
-      await simulateMidnightReset();
       setError(null);
     } catch (e) {
       handleError(e);
@@ -225,10 +214,6 @@ export default function App() {
           <Button
             title="Setup Background Updates With Notification"
             onPress={handleSetupBackgroundUpdates}
-          />
-          <Button
-            title="Simulate Midnight Reset"
-            onPress={handleSimulateMidnightReset}
           />
         </View>
       </ScrollView>
