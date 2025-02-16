@@ -13,6 +13,16 @@ export function initialize(): Promise<boolean> {
   return Promise.resolve(false);
 }
 
+export function getActivityPermissionStatus(): boolean {
+  console.warn(WARNING_MESSAGE);
+  return false;
+}
+
+export function getNotificationPermissionStatus(): boolean {
+  console.warn(WARNING_MESSAGE);
+  return false;
+}
+
 export function getStepsCountAsync(date?: string): Promise<number> {
   console.warn(WARNING_MESSAGE);
   return Promise.resolve(0);

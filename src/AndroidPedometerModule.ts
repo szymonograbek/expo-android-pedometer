@@ -15,6 +15,8 @@ const AndroidPedometer = requireNativeModule<{
   addListener(eventName: string, listener: (event: any) => void): { remove: () => void };
   simulateMidnightReset(): Promise<boolean>;
   getStepsCountInRangeAsync(startTimestamp: string, endTimestamp: string): Promise<Record<string, number>>;
+  getActivityPermissionStatus(): boolean;
+  getNotificationPermissionStatus(): boolean;
 }>('AndroidPedometer');
 
 export function initialize(): Promise<boolean> {
@@ -51,6 +53,14 @@ export function subscribeToChange(
   return () => {
     eventSubscription.remove();
   };
+}
+
+export function getActivityPermissionStatus(): boolean {
+  return AndroidPedometer.getActivityPermissionStatus();
+}
+
+export function getNotificationPermissionStatus(): boolean {
+  return AndroidPedometer.getNotificationPermissionStatus();
 }
 
 export { AndroidPedometerModuleEvents, PermissionResponse };

@@ -44,6 +44,22 @@ export interface AndroidPedometerModule {
   initialize(): Promise<boolean>;
 
   /**
+   * Get the current status of the activity recognition permission.
+   * On Android Q (API 29) and above, this will check ACTIVITY_RECOGNITION permission.
+   * On earlier versions, this will always return true.
+   * @returns boolean - Returns true if permission is granted or not needed
+   */
+  getActivityPermissionStatus(): boolean;
+
+  /**
+   * Get the current status of the notification permission.
+   * On Android 13 (API 33) and above, this will check POST_NOTIFICATIONS permission.
+   * On earlier versions, this will always return true.
+   * @returns boolean - Returns true if permission is granted or not needed
+   */
+  getNotificationPermissionStatus(): boolean;
+
+  /**
    * Get the step count for a specific date or today if no date is provided.
    * @param date Optional ISO date string (YYYY-MM-DD) to get steps for. If not provided, returns steps for today.
    * @returns Promise<number> - Returns the number of steps for the specified date

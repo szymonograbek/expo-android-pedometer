@@ -56,6 +56,22 @@ class AndroidPedometerModule : Module() {
             moduleInstance = this@AndroidPedometerModule
         }
 
+        Function("getActivityPermissionStatus") {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                ContextCompat.checkSelfPermission(context, Manifest.permission.ACTIVITY_RECOGNITION) == PackageManager.PERMISSION_GRANTED
+            } else {
+                true
+            }
+        }
+
+        Function("getNotificationPermissionStatus") {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
+            } else {
+                true
+            }
+        }
+
         AsyncFunction("initialize") { promise: Promise ->
             try {
                 if (isInitialized) {
