@@ -19,12 +19,15 @@ import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneOffset
 import android.content.pm.ServiceInfo
+import java.util.concurrent.atomic.AtomicInteger
 
 class StepCounterService : Service(), SensorEventListener {
     private lateinit var sensorManager: SensorManager
     private lateinit var stepDatabase: StepDatabase
     private var previousStepCount: Int? = null
     private val serviceScope = CoroutineScope(Dispatchers.Default + Job())
+    private val bufferedSteps = AtomicInteger(0)
+    private var aggregationJob: Job? = null
 
     companion object {
         private const val TAG = "StepCounterService"
@@ -33,36 +36,61 @@ class StepCounterService : Service(), SensorEventListener {
         private const val NOTIFICATION_TITLE = "Step Counter"
         private const val NOTIFICATION_TEXT = "Today's steps: %d"
         private const val DEFAULT_ICON_NAME = "footprint"
+        private const val AGGREGATION_INTERVAL_MS = 5000L // 5 seconds
         private var isRunning = false
         private var notificationConfig: Map<String, Any>? = null
+        private var serviceInstance: StepCounterService? = null
 
         fun isServiceRunning(): Boolean = isRunning
 
         fun setNotificationConfig(config: Map<String, Any>?) {
             notificationConfig = config
+            // Update notification if service is running
+            serviceInstance?.let { service ->
+                service.serviceScope.launch {
+                    val todaySteps = service.getTodaySteps()
+                    service.updateNotification(todaySteps)
+                }
+            }
         }
     }
 
     override fun onCreate() {
         super.onCreate()
         isRunning = true
+        serviceInstance = this
         sensorManager = getSystemService(Context.SENSOR_SERVICE) as SensorManager
         stepDatabase = StepDatabase.getInstance(this)
         setupStepSensor()
+        startStepAggregation()
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             createNotificationChannel()
         }
         
-        startForegroundWithNotification()
-        
-        // Get today's steps for initial notification
         serviceScope.launch {
-            updateNotificationWithTodaySteps()
+            val todaySteps = getTodaySteps()
+            startForegroundWithNotification(todaySteps)
         }
     }
 
-    private fun startForegroundWithNotification() {
-        val notification = createNotification(0)
+    private fun startStepAggregation() {
+        aggregationJob = serviceScope.launch {
+            while (isActive) {
+                delay(AGGREGATION_INTERVAL_MS)
+                val steps = bufferedSteps.getAndSet(0)
+                if (steps > 0) {
+                    val now = Instant.now()
+                    val record = StepRecord.create(steps, now)
+                    stepDatabase.stepRecordDao().insertRecord(record)
+                    AndroidPedometerModule.emitStepUpdate(steps, now.toString())
+                    Log.d(TAG, "Aggregated and saved step update - Steps: $steps, Time: $now")
+                }
+            }
+        }
+    }
+
+    private fun startForegroundWithNotification(steps: Int) {
+        val notification = createNotification(steps)
         when {
             Build.VERSION.SDK_INT >= 34 -> { // Android 14
                 startForeground(
@@ -75,7 +103,7 @@ class StepCounterService : Service(), SensorEventListener {
                 startForeground(
                     NOTIFICATION_ID,
                     notification,
-                    ServiceInfo.FOREGROUND_SERVICE_TYPE_NONE
+                    0
                 )
             }
             else -> {
@@ -110,14 +138,12 @@ class StepCounterService : Service(), SensorEventListener {
                 Log.d(TAG, "Step difference: $stepDiff")
                 
                 if (stepDiff > 0) {
-                    val now = Instant.now()
-                    // Save steps immediately
+                    bufferedSteps.addAndGet(stepDiff)
+                    Log.d(TAG, "Added $stepDiff steps to buffer. Current buffer: ${bufferedSteps.get()}")
+                    
+                    // Update notification immediately
                     serviceScope.launch {
-                        val record = StepRecord.create(stepDiff, now)
-                        stepDatabase.stepRecordDao().insertRecord(record)
-                        AndroidPedometerModule.emitStepUpdate(stepDiff, now.toString())
                         updateNotificationWithTodaySteps()
-                        Log.d(TAG, "Saved and emitted step update - Steps: $stepDiff, Time: $now")
                     }
                 }
                 previousStepCount = totalSteps
@@ -129,7 +155,7 @@ class StepCounterService : Service(), SensorEventListener {
         val today = LocalDate.now(ZoneOffset.UTC)
         val startInstant = today.atStartOfDay().toInstant(ZoneOffset.UTC)
         val endInstant = today.plusDays(1).atStartOfDay().toInstant(ZoneOffset.UTC)
-        return stepDatabase.stepRecordDao().getTotalStepsInRange(startInstant.toString(), endInstant.toString()) ?: 0
+        return stepDatabase.stepRecordDao().getTotalStepsInRange(startInstant.toString(), endInstant.toString())
     }
 
     private suspend fun updateNotificationWithTodaySteps() {
@@ -207,7 +233,9 @@ class StepCounterService : Service(), SensorEventListener {
 
     override fun onDestroy() {
         super.onDestroy()
+        serviceInstance = null
         sensorManager.unregisterListener(this)
+        aggregationJob?.cancel()
         serviceScope.cancel()
     }
 } 

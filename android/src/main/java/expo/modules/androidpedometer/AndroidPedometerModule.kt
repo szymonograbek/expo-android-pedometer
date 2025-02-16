@@ -217,10 +217,15 @@ class AndroidPedometerModule : Module() {
             try {
                 checkInitialized()
                 if (StepCounterService.isServiceRunning()) {
+                    // Update notification config even if service is running
+                    StepCounterService.setNotificationConfig(config)
                     promise.resolve(true)
                     return@AsyncFunction
                 }
 
+                // Set notification config before starting the service
+                StepCounterService.setNotificationConfig(config)
+                
                 val serviceIntent = Intent(context, StepCounterService::class.java)
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                     context.startForegroundService(serviceIntent)

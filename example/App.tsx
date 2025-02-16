@@ -148,11 +148,11 @@ export default function App() {
               {format(range.end, "PP p")}:
             </Text>
 
-            {Object.entries(stepsInRange).map(([date, steps]) => (
+            {/* {Object.entries(stepsInRange).map(([date, steps]) => (
               <Text key={date}>
                 {formatISO(date)}: {steps}
               </Text>
-            ))}
+            ))} */}
 
             <View style={{ flexDirection: "row", gap: 10 }}>
               <Button
