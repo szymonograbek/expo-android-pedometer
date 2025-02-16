@@ -141,9 +141,12 @@ class StepCounterService : Service(), SensorEventListener {
                     bufferedSteps.addAndGet(stepDiff)
                     Log.d(TAG, "Added $stepDiff steps to buffer. Current buffer: ${bufferedSteps.get()}")
                     
-                    // Update notification immediately
+                    // Update notification with current steps plus buffered steps
                     serviceScope.launch {
-                        updateNotificationWithTodaySteps()
+                        val currentSteps = getTodaySteps()
+                        val bufferedStepsCount = bufferedSteps.get()
+                        Log.d(TAG, "Updating notification - DB steps: $currentSteps, Buffered steps: $bufferedStepsCount")
+                        updateNotification(currentSteps + bufferedStepsCount)
                     }
                 }
                 previousStepCount = totalSteps

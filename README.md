@@ -16,57 +16,6 @@ A native Android pedometer module for Expo/React Native applications that provid
 npx expo install expo-android-pedometer
 ```
 
-Add the following to your app's `AndroidManifest.xml`:
-
-```xml
-<manifest>
-    <!-- Step counter permissions -->
-    <uses-permission android:name="android.permission.ACTIVITY_RECOGNITION" />
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_HEALTH" />
-    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
-    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
-
-    <!-- Step counter sensor feature -->
-    <uses-feature 
-        android:name="android.hardware.sensor.stepcounter"
-        android:required="true" />
-
-    <application>
-        <!-- Step counter service -->
-        <service 
-            android:name="expo.modules.androidpedometer.service.StepCounterService"
-            android:enabled="true"
-            android:exported="false"
-            android:foregroundServiceType="health" />
-
-        <!-- Boot receiver for auto-start -->
-        <receiver
-            android:name="expo.modules.androidpedometer.service.StepCounterServiceLauncher"
-            android:enabled="true"
-            android:exported="false">
-            <intent-filter>
-                <action android:name="android.intent.action.BOOT_COMPLETED" />
-                <category android:name="android.intent.category.DEFAULT" />
-            </intent-filter>
-        </receiver>
-    </application>
-</manifest>
-```
-
-These additions are required for:
-- **Permissions**:
-  - `ACTIVITY_RECOGNITION`: Access to step counter sensor (Android 10+)
-  - `FOREGROUND_SERVICE`: Running the step counter service in the background
-  - `FOREGROUND_SERVICE_HEALTH`: Required for health-related foreground services (Android 14+)
-  - `POST_NOTIFICATIONS`: Showing the persistent notification (Android 13+)
-  - `RECEIVE_BOOT_COMPLETED`: Auto-starting the service after device reboot
-
-- **Service Declaration**: Required for the background step counting service
-- **Receiver Declaration**: Required for auto-starting the service after device reboot
-
-The `uses-feature` declaration ensures that the app will only be installable on devices that have a step counter sensor.
-
 ## API
 
 ### Methods
@@ -78,6 +27,8 @@ Initialize the pedometer module and prepare it for use.
 ```typescript
 const isInitialized = await AndroidPedometer.initialize();
 ```
+
+Returns `Promise<boolean>` - `true` if initialization was successful. Throws an error if the device doesn't have a step counter sensor or initialization fails.
 
 #### `getStepsCountAsync(date?: string)`
 
@@ -91,12 +42,55 @@ const todaySteps = await AndroidPedometer.getStepsCountAsync();
 const specificDateSteps = await AndroidPedometer.getStepsCountAsync('2024-03-15');
 ```
 
+Returns `Promise<number>` - the number of steps for the specified date. Throws an error if pedometer is not initialized or fails to get step count.
+
+#### `getStepsCountInRangeAsync(startTimestamp: string, endTimestamp: string)`
+
+Get the step counts for a specific time range.
+
+```typescript
+const startTime = '2024-03-15T00:00:00Z';
+const endTime = '2024-03-15T23:59:59Z';
+const stepCounts = await AndroidPedometer.getStepsCountInRangeAsync(startTime, endTime);
+```
+
+Returns `Promise<Record<string, number>>` - a map of ISO timestamps to step counts for each minute in the range.
+
+#### `getActivityPermissionStatus()`
+
+Get the current status of the activity recognition permission.
+
+```typescript
+const hasActivityPermission = AndroidPedometer.getActivityPermissionStatus();
+```
+
+Returns `boolean` - `true` if permission is granted or not needed (pre-Android Q).
+
+#### `getNotificationPermissionStatus()`
+
+Get the current status of the notification permission.
+
+```typescript
+const hasNotificationPermission = AndroidPedometer.getNotificationPermissionStatus();
+```
+
+Returns `boolean` - `true` if permission is granted or not needed (pre-Android 13).
+
 #### `requestPermissions()`
 
 Request necessary permissions for step counting (ACTIVITY_RECOGNITION permission on Android Q and above).
 
 ```typescript
 const permissionResponse = await AndroidPedometer.requestPermissions();
+```
+
+Returns `Promise<PermissionResponse>` with the following shape:
+```typescript
+type PermissionResponse = {
+  status: 'granted' | 'denied';
+  granted: boolean;
+  expires: 'never' | string;
+};
 ```
 
 #### `requestNotificationPermissions()`
@@ -107,6 +101,8 @@ Request notification permissions required for background service (POST_NOTIFICAT
 const notificationPermissionResponse = await AndroidPedometer.requestNotificationPermissions();
 ```
 
+Returns `Promise<PermissionResponse>` with the same shape as `requestPermissions()`.
+
 #### `setupBackgroundUpdates(config?: NotificationConfig)`
 
 Setup background step counting that continues even when the app is in the background or terminated.
@@ -115,12 +111,24 @@ Setup background step counting that continues even when the app is in the backgr
 const config = {
   title: "Step Counter",
   contentTemplate: "You've taken %d steps today",
-  style: "default",
+  style: "default", // or "bigText"
   iconResourceName: "ic_notification"
 };
 
 await AndroidPedometer.setupBackgroundUpdates(config);
 ```
+
+The `NotificationConfig` type has the following properties:
+```typescript
+type NotificationConfig = {
+  title?: string;              // Title of the notification
+  contentTemplate?: string;    // Content template (%d will be replaced with steps)
+  style?: 'default' | 'bigText'; // Style of the notification
+  iconResourceName?: string;   // Resource name of the icon to use
+};
+```
+
+Returns `Promise<boolean>` - `true` if background updates were successfully setup.
 
 #### `subscribeToChange(listener: (event: PedometerUpdateEventPayload) => void)`
 
@@ -136,6 +144,13 @@ const unsubscribe = AndroidPedometer.subscribeToChange((event) => {
 unsubscribe();
 ```
 
+The `PedometerUpdateEventPayload` type has the following shape:
+```typescript
+type PedometerUpdateEventPayload = {
+  steps: number;
+  timestamp: number;
+};
+```
 
 ## Example Usage
 
@@ -145,25 +160,46 @@ import * as AndroidPedometer from 'expo-android-pedometer';
 async function setupPedometer() {
   try {
     // Initialize the pedometer
-    await AndroidPedometer.initialize();
+    const isInitialized = await AndroidPedometer.initialize();
+    
+    // Check current permission status
+    const hasActivityPermission = AndroidPedometer.getActivityPermissionStatus();
+    const hasNotificationPermission = AndroidPedometer.getNotificationPermissionStatus();
+    
+    if (!hasActivityPermission || !hasNotificationPermission) {
+      // Request necessary permissions
+      const permissionResponse = await AndroidPedometer.requestPermissions();
+      const notificationPermissionResponse = await AndroidPedometer.requestNotificationPermissions();
 
-    // Request necessary permissions
-    const permissionResponse = await AndroidPedometer.requestPermissions();
-    const notificationPermissionResponse = await AndroidPedometer.requestNotificationPermissions();
-
-    if (permissionResponse.granted && notificationPermissionResponse.granted) {
-      // Setup background updates
-      await AndroidPedometer.setupBackgroundUpdates({
-        title: "Step Counter",
-        contentTemplate: "You've taken %d steps today",
-        style: "default"
-      });
-
-      // Subscribe to step updates
-      const unsubscribe = AndroidPedometer.subscribeToChange((event) => {
-        console.log(`Steps: ${event.steps}`);
-      });
+      if (!permissionResponse.granted || !notificationPermissionResponse.granted) {
+        console.log('Required permissions were not granted');
+        return;
+      }
     }
+
+    // Setup background updates with custom notification
+    await AndroidPedometer.setupBackgroundUpdates({
+      title: "Step Counter",
+      contentTemplate: "You've taken %d steps today",
+      style: "bigText",
+      iconResourceName: "ic_notification"
+    });
+
+    // Subscribe to real-time step updates
+    const unsubscribe = AndroidPedometer.subscribeToChange((event) => {
+      console.log(`Steps: ${event.steps} at timestamp: ${event.timestamp}`);
+    });
+
+    // Get today's steps
+    const todaySteps = await AndroidPedometer.getStepsCountAsync();
+    console.log(`Today's steps: ${todaySteps}`);
+
+    // Get steps for a specific date range
+    const startTime = '2024-03-15T00:00:00Z';
+    const endTime = '2024-03-15T23:59:59Z';
+    const stepCounts = await AndroidPedometer.getStepsCountInRangeAsync(startTime, endTime);
+    console.log('Step counts by minute:', stepCounts);
+
   } catch (error) {
     console.error('Error setting up pedometer:', error);
   }
@@ -180,7 +216,6 @@ async function setupPedometer() {
 - [ ] Optional sync to Health Connect
 - [ ] Ability to disable notification and background sync
 - [ ] More options to customize the notification
-- [ ] Organize code
 
 ## License
 

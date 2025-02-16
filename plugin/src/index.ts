@@ -31,20 +31,20 @@ const withPedometer: ConfigPlugin<{} | void> = (config) => {
       },
     });
 
-    // Add PedometerService
+    // Add StepCounterService
     const serviceElement = {
       $: {
-        'android:name': 'expo.modules.androidpedometer.PedometerService',
+        'android:name': 'expo.modules.androidpedometer.service.StepCounterService',
         'android:enabled': 'true',
         'android:exported': 'false',
         'android:foregroundServiceType': 'health',
       },
     } as const;
 
-    // Add PedometerServiceLauncher receiver
+    // Add StepCounterServiceLauncher receiver
     const receiverElement = {
       $: {
-        'android:name': 'expo.modules.androidpedometer.PedometerServiceLauncher',
+        'android:name': 'expo.modules.androidpedometer.service.StepCounterServiceLauncher',
         'android:enabled': 'true' as const,
         'android:exported': 'false' as const,
       },
