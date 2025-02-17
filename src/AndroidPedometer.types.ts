@@ -3,10 +3,14 @@ export type PedometerUpdateEventPayload = {
   timestamp: number;
 };
 
+export type PermissionStatus = 'granted' | 'denied' | 'undetermined';
+export type PermissionExpiration = 'never' | string;
+
 export type PermissionResponse = {
-  status: 'granted' | 'denied';
+  status: PermissionStatus;
   granted: boolean;
-  expires: 'never' | string;
+  expires: PermissionExpiration;
+  canAskAgain: boolean;
 };
 
 export type AndroidPedometerModuleEvents = {

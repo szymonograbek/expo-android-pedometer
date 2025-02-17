@@ -7,8 +7,10 @@ import {
   subscribeToChange,
   PedometerUpdateEventPayload,
   getStepsCountInRangeAsync,
+  getActivityPermissionStatus,
+  getNotificationPermissionStatus
 } from "android-pedometer";
-import { useEffect } from "react";
+import { useCallback, useEffect } from "react";
 import { useState } from "react";
 import {
   Button,
@@ -30,6 +32,21 @@ import DatePicker from "react-native-date-picker";
 export default function App() {
   const [isStartDayPickerOpen, setIsStartDayPickerOpen] = useState(false);
   const [isEndDayPickerOpen, setIsEndDayPickerOpen] = useState(false);
+
+  const [hasActivityRecognitionPermission, setHasActivityRecognitionPermission] = useState(false);
+  const [hasNotificationPermission, setHasNotificationPermission] = useState(false);
+
+  const checkPermissions = useCallback(async () => {
+    const activityPermission = await getActivityPermissionStatus();
+    const notificationPermission = await getNotificationPermissionStatus();
+    
+    setHasActivityRecognitionPermission(activityPermission.granted);
+    setHasNotificationPermission(notificationPermission.granted);
+  }, []);
+
+  useEffect(() => {
+    checkPermissions();
+  }, [checkPermissions]);
 
   const [range, setRange] = useState({
     start: startOfDay(new Date()),
@@ -90,6 +107,7 @@ export default function App() {
         throw new Error("Activity recognition permission was denied");
       }
       setError(null);
+      checkPermissions();
     } catch (e) {
       handleError(e);
     }
@@ -102,6 +120,7 @@ export default function App() {
         throw new Error("Notification permission was denied");
       }
       setError(null);
+      checkPermissions();
     } catch (e) {
       handleError(e);
     }
@@ -200,6 +219,8 @@ export default function App() {
         {error && <Text style={styles.error}>{error}</Text>}
 
         <View style={styles.buttonContainer}>
+          <Text>Activity Recognition Permission: {hasActivityRecognitionPermission ? "Granted" : "Denied"}</Text>
+          <Text>Notification Permission: {hasNotificationPermission ? "Granted" : "Denied"}</Text>
           <Button title="Initialize" onPress={handleInitialize} />
           <Button title="Get Steps" onPress={handleGetSteps} />
           <Button title="Get Steps In Range" onPress={handleGetStepsInRange} />

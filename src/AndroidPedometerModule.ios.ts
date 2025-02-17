@@ -13,14 +13,24 @@ export function initialize(): Promise<boolean> {
   return Promise.resolve(false);
 }
 
-export function getActivityPermissionStatus(): boolean {
+export function getActivityPermissionStatus(): Promise<PermissionResponse> {
   console.warn(WARNING_MESSAGE);
-  return false;
+  return Promise.resolve({
+    status: 'undetermined',
+    granted: false,
+    expires: 'never',
+    canAskAgain: false
+  });
 }
 
-export function getNotificationPermissionStatus(): boolean {
+export function getNotificationPermissionStatus(): Promise<PermissionResponse> {
   console.warn(WARNING_MESSAGE);
-  return false;
+  return Promise.resolve({
+    status: 'undetermined',
+    granted: false,
+    expires: 'never',
+    canAskAgain: false
+  });
 }
 
 export function getStepsCountAsync(date?: string): Promise<number> {
@@ -31,6 +41,7 @@ export function getStepsCountAsync(date?: string): Promise<number> {
 export function requestPermissions(): Promise<PermissionResponse> {
   console.warn(WARNING_MESSAGE);
   return Promise.resolve({
+    canAskAgain: false,
     status: 'denied',
     granted: false,
     expires: 'never'
@@ -40,6 +51,7 @@ export function requestPermissions(): Promise<PermissionResponse> {
 export function requestNotificationPermissions(): Promise<PermissionResponse> {
   console.warn(WARNING_MESSAGE);
   return Promise.resolve({
+    canAskAgain: false,
     status: 'denied',
     granted: false,
     expires: 'never'

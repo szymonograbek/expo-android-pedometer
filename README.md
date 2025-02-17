@@ -61,20 +61,28 @@ Returns `Promise<Record<string, number>>` - a map of ISO timestamps to step coun
 Get the current status of the activity recognition permission.
 
 ```typescript
-const hasActivityPermission = AndroidPedometer.getActivityPermissionStatus();
+const permissionStatus = await AndroidPedometer.getActivityPermissionStatus();
 ```
 
-Returns `boolean` - `true` if permission is granted or not needed (pre-Android Q).
+Returns `Promise<PermissionResponse>` with the following shape:
+```typescript
+type PermissionResponse = {
+  status: 'granted' | 'denied' | 'undetermined';  // Current status of the permission
+  granted: boolean;                               // Convenience boolean for granted status
+  expires: 'never' | string;                      // When the permission expires
+  canAskAgain: boolean;                          // Whether the user can be asked again
+};
+```
 
 #### `getNotificationPermissionStatus()`
 
 Get the current status of the notification permission.
 
 ```typescript
-const hasNotificationPermission = AndroidPedometer.getNotificationPermissionStatus();
+const permissionStatus = await AndroidPedometer.getNotificationPermissionStatus();
 ```
 
-Returns `boolean` - `true` if permission is granted or not needed (pre-Android 13).
+Returns `Promise<PermissionResponse>` with the same shape as `getActivityPermissionStatus()`.
 
 #### `requestPermissions()`
 

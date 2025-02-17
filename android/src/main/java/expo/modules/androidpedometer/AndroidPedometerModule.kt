@@ -17,6 +17,7 @@ import expo.modules.kotlin.Promise
 import expo.modules.kotlin.exception.Exceptions
 import expo.modules.kotlin.modules.Module
 import expo.modules.kotlin.modules.ModuleDefinition
+import expo.modules.interfaces.permissions.Permissions
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -56,19 +57,61 @@ class AndroidPedometerModule : Module() {
             moduleInstance = this@AndroidPedometerModule
         }
 
-        Function("getActivityPermissionStatus") {
+        AsyncFunction("getActivityPermissionStatus") { promise: Promise ->
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                ContextCompat.checkSelfPermission(context, Manifest.permission.ACTIVITY_RECOGNITION) == PackageManager.PERMISSION_GRANTED
+                Permissions.getPermissionsWithPermissionsManager(
+                    appContext.permissions,
+                    promise,
+                    Manifest.permission.ACTIVITY_RECOGNITION
+                )
             } else {
-                true
+                // Permissions don't need to be requested on Android versions below Q
+                Permissions.getPermissionsWithPermissionsManager(appContext.permissions, promise)
             }
         }
 
-        Function("getNotificationPermissionStatus") {
+        AsyncFunction("getNotificationPermissionStatus") { promise: Promise ->
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
+                Permissions.getPermissionsWithPermissionsManager(
+                    appContext.permissions,
+                    promise,
+                    Manifest.permission.POST_NOTIFICATIONS
+                )
             } else {
-                true
+                // Permissions don't need to be requested on Android versions below 13
+                Permissions.getPermissionsWithPermissionsManager(appContext.permissions, promise)
+            }
+        }
+
+        AsyncFunction("requestPermissions") { promise: Promise ->
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                val permissions = mutableListOf(Manifest.permission.ACTIVITY_RECOGNITION)
+                
+                if (Build.VERSION.SDK_INT >= 34) { // Android 14 (API 34)
+                    permissions.add("android.permission.FOREGROUND_SERVICE_HEALTH")
+                }
+
+                Permissions.askForPermissionsWithPermissionsManager(
+                    appContext.permissions,
+                    promise,
+                    *permissions.toTypedArray()
+                )
+            } else {
+                // Permissions don't need to be requested on Android versions below Q
+                Permissions.askForPermissionsWithPermissionsManager(appContext.permissions, promise)
+            }
+        }
+
+        AsyncFunction("requestNotificationPermissions") { promise: Promise ->
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                Permissions.askForPermissionsWithPermissionsManager(
+                    appContext.permissions,
+                    promise,
+                    Manifest.permission.POST_NOTIFICATIONS
+                )
+            } else {
+                // Permissions don't need to be requested on Android versions below 13
+                Permissions.askForPermissionsWithPermissionsManager(appContext.permissions, promise)
             }
         }
 
@@ -162,73 +205,6 @@ class AndroidPedometerModule : Module() {
             }
         }
 
-        AsyncFunction("requestPermissions") { promise: Promise ->
-            try {
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                    val activity = appContext.activityProvider?.currentActivity
-                        ?: throw IllegalStateException("Activity not found")
-
-                    val permissions = mutableListOf(Manifest.permission.ACTIVITY_RECOGNITION)
-                    
-                    if (Build.VERSION.SDK_INT >= 34) { // Android 14 (API 34)
-                        permissions.add("android.permission.FOREGROUND_SERVICE_HEALTH")
-                    }
-
-                    val allGranted = permissions.all { permission ->
-                        ContextCompat.checkSelfPermission(context, permission) == PackageManager.PERMISSION_GRANTED
-                    }
-
-                    if (allGranted) {
-                        promise.resolve(createPermissionResponse(true))
-                        return@AsyncFunction
-                    }
-
-                    ActivityCompat.requestPermissions(
-                        activity,
-                        permissions.toTypedArray(),
-                        0
-                    )
-                    
-                    val granted = permissions.all { permission ->
-                        ContextCompat.checkSelfPermission(context, permission) == PackageManager.PERMISSION_GRANTED
-                    }
-                    promise.resolve(createPermissionResponse(granted))
-                } else {
-                    promise.resolve(createPermissionResponse(true))
-                }
-            } catch (e: Exception) {
-                promise.reject("ERR_PERMISSIONS", e.message, e)
-            }
-        }
-
-        AsyncFunction("requestNotificationPermissions") { promise: Promise ->
-            try {
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                    val activity = appContext.activityProvider?.currentActivity
-                        ?: throw IllegalStateException("Activity not found")
-
-                    val permission = Manifest.permission.POST_NOTIFICATIONS
-                    if (ContextCompat.checkSelfPermission(context, permission) == PackageManager.PERMISSION_GRANTED) {
-                        promise.resolve(createPermissionResponse(true))
-                        return@AsyncFunction
-                    }
-
-                    ActivityCompat.requestPermissions(
-                        activity,
-                        arrayOf(permission),
-                        1
-                    )
-                    promise.resolve(createPermissionResponse(
-                        ContextCompat.checkSelfPermission(context, permission) == PackageManager.PERMISSION_GRANTED
-                    ))
-                } else {
-                    promise.resolve(createPermissionResponse(true))
-                }
-            } catch (e: Exception) {
-                promise.reject("ERR_PERMISSIONS", e.message, e)
-            }
-        }
-
         AsyncFunction("setupBackgroundUpdates") { config: Map<String, Any>?, promise: Promise ->
             try {
                 checkInitialized()
@@ -270,13 +246,5 @@ class AndroidPedometerModule : Module() {
         if (!isInitialized) {
             throw IllegalStateException("Pedometer is not initialized. Call initialize() first.")
         }
-    }
-
-    private fun createPermissionResponse(granted: Boolean): Map<String, Any> {
-        return mapOf(
-            "status" to if (granted) "granted" else "denied",
-            "granted" to granted,
-            "expires" to "never"
-        )
     }
 }
