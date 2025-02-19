@@ -1,6 +1,6 @@
 {
   "name": "expo-android-pedometer",
-  "version": "0.2.3",
+  "version": "0.2.4",
   "description": "Get steps count on Android devices",
   "main": "build/index.js",
   "types": "build/index.d.ts",

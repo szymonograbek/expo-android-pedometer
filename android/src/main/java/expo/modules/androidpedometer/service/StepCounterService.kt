@@ -99,13 +99,6 @@ class StepCounterService : Service(), SensorEventListener {
                     ServiceInfo.FOREGROUND_SERVICE_TYPE_HEALTH
                 )
             }
-            Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q -> { // Android 10+
-                startForeground(
-                    NOTIFICATION_ID,
-                    notification,
-                    0
-                )
-            }
             else -> {
                 startForeground(NOTIFICATION_ID, notification)
             }
